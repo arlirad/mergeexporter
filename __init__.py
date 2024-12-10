@@ -102,9 +102,14 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
             if not collection.merge_exporter_props.active:
                 continue
 
+            #self.process(context, collection)
             self.merge(context, collection, None)
 
         return {'FINISHED'}
+
+
+    def process(self, context, collection):
+        pass
 
 
     def merge(self, context, collection, parent):
@@ -116,7 +121,6 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         path = prefix + collection.name + "." + format
 
         objects = list(collection.objects)
-        objects = [obj for obj in objects if obj.type != "ARMATURE" and obj.type != "EMPTY"]
         objects = [obj for obj in objects if obj.type != "ARMATURE" and obj.type != "EMPTY"]
         bpy.context.view_layer.objects.active = objects[0]
 
@@ -142,7 +146,8 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
             with bpy.context.temp_override(active_object=context.selected_objects[0], selected_objects={context.selected_objects[0]}):
                 bpy.ops.object.convert()
 
-        bpy.ops.collection.merge_export_bake(prefix=collection.name, size=props.texture_size)
+        if props.bake:
+            bpy.ops.collection.merge_export_bake(prefix=collection.name, size=props.texture_size)
 
         self.apply_modifiers(context)
 
@@ -152,9 +157,11 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         merged = context.selected_objects[0]
 
         merged.name = collection.name
-        self.materialize(merged)
 
-        if save_textures:
+        if props.bake and save_textures:
+            self.materialize(merged)
+
+        if props.bake and save_textures:
             self.save_textures(merged, prefix)
 
         hidden = {}
@@ -330,6 +337,10 @@ class MergeExporter_CollectionProps(bpy.types.PropertyGroup):
         name="Bake",
         default=True,
     )
+    merge: bpy.props.BoolProperty(
+        name="Merge",
+        default=True,
+    )
     path: bpy.props.StringProperty(
         name="Export Path",
         subtype='DIR_PATH',
@@ -365,18 +376,11 @@ class EntityList(bpy.types.UIList):
         row.prop(item.merge_exporter_props, "active")
         row.prop(item.merge_exporter_props, "bake")
 
-        if not item.merge_exporter_props.active:
-            return
-
-        row = column.row()
-        row.prop(item.merge_exporter_props, "path")
-
-        row = column.row()
-        row.prop(item.merge_exporter_props, "texture_size")
-
 
 class MyRenderSettings(bpy.types.PropertyGroup):
     entities: bpy.props.BoolProperty(name="entities", default=False)
+    entity_details: bpy.props.BoolProperty(name="entity_details", default=False)
+    textures: bpy.props.BoolProperty(name="textures", default=False)
     export_index: bpy.props.IntProperty(name="export_index")
     textures: bpy.props.BoolProperty(name="textures", default=False)
     material_count: bpy.props.IntProperty(name="Material Count", default=4)
@@ -418,6 +422,22 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
             sub_layout = sub_panel[1]
             row = sub_layout.row()
             row.template_list("EntityList", "", bpy.context.scene.collection, "children", my_settings, "export_index")
+
+        sub_panel = layout.panel_prop(my_settings, "entity_details")
+        sub_panel[0].label(text="Entity Details")
+        if sub_panel[1]:
+            collections = bpy.context.scene.collection.children
+
+            if my_settings.export_index < len(collections):
+                collection = bpy.context.scene.collection.children[my_settings.export_index]
+
+                if collection != None:
+                    sub_layout = sub_panel[1]
+                    row = sub_layout.row()
+                    row.prop(collection.merge_exporter_props, "path")
+
+                    row = sub_layout.row()
+                    row.prop(collection.merge_exporter_props, "texture_size")
 
         sub_panel = layout.panel_prop(my_settings, "textures")
         sub_panel[0].label(text="Bake")
