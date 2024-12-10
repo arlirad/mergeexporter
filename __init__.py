@@ -98,104 +98,135 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
     bl_label = "Merge Export"
 
     def execute(self, context):
+        for collection in context.scene.collection.children:
+            if not collection.merge_exporter_props.active:
+                continue
+
+            self.merge(context, collection, None)
+
+        return {'FINISHED'}
+
+
+    def merge(self, context, collection, parent):
         format = context.scene.my_render_settings.export_format
         save_textures = context.scene.my_render_settings.save_textures
 
-        for collection in context.scene.collection.children:
-            props = collection.merge_exporter_props
+        props = collection.merge_exporter_props
+        prefix = os.path.abspath(bpy.path.abspath(props.path)) + "/"
+        path = prefix + collection.name + "." + format
 
-            if not props.active:
+        objects = list(collection.objects)
+        objects = [obj for obj in objects if obj.type != "ARMATURE" and obj.type != "EMPTY"]
+        objects = [obj for obj in objects if obj.type != "ARMATURE" and obj.type != "EMPTY"]
+        bpy.context.view_layer.objects.active = objects[0]
+
+        bpy.ops.object.select_all(action="DESELECT")
+
+        origin = mathutils.Matrix.Identity(4)
+
+        for object in collection.objects:
+            if object.name == ".origin":
+                origin = object.matrix_world
+
+        override = {}
+        override["active_object"] = objects[0]
+        override["selected_objects"] = objects
+
+        with context.temp_override(**override):
+            bpy.ops.object.duplicate()
+
+        for object in context.selected_objects:
+            if object.type == "MESH":
                 continue
 
-            prefix = os.path.abspath(bpy.path.abspath(props.path)) + "/"
-            path = prefix + collection.name + "." + format
-
-            objects = list(collection.objects)
-            objects = [obj for obj in objects if obj.type != "ARMATURE" and obj.type != "EMPTY"]
-            objects = [obj for obj in objects if obj.type != "ARMATURE" and obj.type != "EMPTY"]
-            bpy.context.view_layer.objects.active = objects[0]
-
-            bpy.ops.object.select_all(action="DESELECT")
-
-            origin = mathutils.Matrix.Identity(4)
-
-            for object in collection.objects:
-                if object.name == ".origin":
-                    origin = object.matrix_world
-
-            override = {}
-            override["active_object"] = objects[0]
-            override["selected_objects"] = objects
-
-            with context.temp_override(**override):
-                bpy.ops.object.duplicate()
-
-            for object in context.selected_objects:
-                if object.type == "MESH":
-                    continue
-
-                with bpy.context.temp_override(active_object=context.selected_objects[0], selected_objects={context.selected_objects[0]}):
-                    bpy.ops.object.convert()
-
-            bpy.ops.collection.merge_export_bake(prefix=collection.name, size=props.texture_size)
-
-            for object in context.selected_objects:
-                object.data = object.data.copy()
-
-                with bpy.context.temp_override(active_object=object, selected_objects={object}):
-                    for i, mod in enumerate(object.modifiers):
-                        if type(mod) is bpy.types.ArmatureModifier:
-                            continue
-
-                        bpy.ops.object.modifier_apply(modifier=mod.name)
-
             with bpy.context.temp_override(active_object=context.selected_objects[0], selected_objects={context.selected_objects[0]}):
-                bpy.ops.object.join()
+                bpy.ops.object.convert()
 
-            merged = context.selected_objects[0]
+        bpy.ops.collection.merge_export_bake(prefix=collection.name, size=props.texture_size)
 
-            merged.name = collection.name
-            self.materialize(merged)
+        self.apply_modifiers(context)
 
-            if save_textures:
-                self.save_textures(merged, prefix)
+        with bpy.context.temp_override(active_object=context.selected_objects[0], selected_objects={context.selected_objects[0]}):
+            bpy.ops.object.join()
 
-            hidden = {}
+        merged = context.selected_objects[0]
 
-            for object in collection.objects:
-                if object.type == "ARMATURE":
-                    hidden[object.name] = object.hide_get()
+        merged.name = collection.name
+        self.materialize(merged)
 
-                    object.hide_set(False)
-                    object.select_set(True)
+        if save_textures:
+            self.save_textures(merged, prefix)
 
-            for object in context.selected_objects:
-                object.matrix_world = origin.inverted() @ object.matrix_world
+        hidden = {}
 
-            if format == "gltf":
-                bpy.ops.export_scene.gltf(
-                    filepath = path,
-                    use_selection=True
-                )
-            else:
-                bpy.ops.export_scene.fbx(
-                    filepath = path,
-                    use_selection=True
-                )
+        bpy.ops.object.select_all(action="DESELECT")
 
-            for object in context.selected_objects:
-                object.matrix_world = origin @ object.matrix_world
+        self.select_unmerges(collection)
+        bpy.ops.object.duplicate()
+        self.apply_modifiers(context)
 
-            bpy.ops.object.select_all(action="DESELECT")
+        unmerged = list(context.selected_objects)
 
-            for name in hidden:
-                collection.objects[name].hide_set(hidden[name])
+        merged.select_set(True)
 
-            merged.select_set(True)
-            bpy.ops.object.delete()
+        for object in collection.objects:
+            if object.type == "ARMATURE":
+                hidden[object.name] = object.hide_get()
+
+                object.hide_set(False)
+                object.select_set(True)
+
+        for object in context.selected_objects:
+            object.matrix_world = origin.inverted() @ object.matrix_world
+
+        if format == "gltf":
+            bpy.ops.export_scene.gltf(
+                filepath = path,
+                use_selection=True
+            )
+        else:
+            bpy.ops.export_scene.fbx(
+                filepath = path,
+                use_selection=True
+            )
+
+        for object in context.selected_objects:
+            object.matrix_world = origin @ object.matrix_world
+
+        bpy.ops.object.select_all(action="DESELECT")
+
+        for name in hidden:
+            collection.objects[name].hide_set(hidden[name])
+
+        merged.select_set(True)
+
+        for object in unmerged:
+            object.select_set(True)
+
+        bpy.ops.object.delete()
 
 
-        return {'FINISHED'}
+    def apply_modifiers(self, context):
+        for object in context.selected_objects:
+            object.data = object.data.copy()
+
+            with bpy.context.temp_override(active_object=object, selected_objects={object}):
+                for i, mod in enumerate(object.modifiers):
+                    if type(mod) is bpy.types.ArmatureModifier:
+                        continue
+
+                    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+    def select_unmerges(self, collection):
+        for child in collection.children:
+            self.select_unmerges(child)
+
+            if child.name[0] != '.':
+                continue
+
+            for object in child.objects:
+                object.select_set(True)
 
 
     def materialize(self, object):
