@@ -180,7 +180,7 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         merged.select_set(True)
 
         for object in collection.objects:
-            if object.type == "ARMATURE":
+            if object.type == "ARMATURE" or object.type == "EMPTY":
                 hidden[object.name] = object.hide_get()
 
                 object.hide_set(False)
