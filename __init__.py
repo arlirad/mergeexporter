@@ -32,6 +32,10 @@ class OBJECT_OT_MergeExportBake(bpy.types.Operator):
             self.swap_to(context, self.get(prefix + ".emission"))
             bpy.ops.object.bake(type="EMIT")
 
+        if texture_toggles.ao_toggle:
+            self.swap_to(context, self.get(prefix + ".ao"))
+            bpy.ops.object.bake(type="AO")
+
         return {'FINISHED'}
 
 
@@ -88,7 +92,7 @@ class OBJECT_OT_MergeExportBake(bpy.types.Operator):
             bpy.ops.image.new(name=name, width=self.size, height=self.size)
             image = images.get(name)
 
-            if not "albedo" in name and not "emission" in name:
+            if "normal" in name or "rough" in name:
                 image.colorspace_settings.name = 'Non-Color'
 
             image.use_fake_user = True
@@ -334,6 +338,9 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         if texture_toggles.emission_toggle:
             self.save_image(object.name + ".emission", prefix + object.name + ".emission" + format)
 
+        if texture_toggles.ao_toggle:
+            self.save_image(object.name + ".ao", prefix + object.name + ".ao" + format)
+
 
     def save_image(self, name, destination):
         original = bpy.data.images.get(name)
@@ -391,6 +398,10 @@ class TextureToggles(bpy.types.PropertyGroup):
     emission_toggle: bpy.props.BoolProperty(
         name="Emission",
         default=True,
+    )
+    ao_toggle: bpy.props.BoolProperty(
+        name="Ambient Occlusion",
+        default=False,
     )
 
 
@@ -482,6 +493,7 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
 
             row = sub_layout.row()
             row.prop(my_settings.texture_toggles, "emission_toggle")
+            row.prop(my_settings.texture_toggles, "ao_toggle")
 
         row = layout.row().split(factor=0.33)
         row.label(text="Export Format")
