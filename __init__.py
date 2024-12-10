@@ -299,7 +299,7 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
             self.save_image(object.name + ".albedo", prefix + object.name + ".albedo" + format)
 
         if texture_toggles.normal_toggle:
-            self.save_image(object.name + ".normal_toggle", prefix + object.name + ".normal" + format)
+            self.save_image(object.name + ".normal", prefix + object.name + ".normal" + format)
 
         if texture_toggles.rough_toggle:
             self.save_image(object.name + ".rough", prefix + object.name + ".rough" + format)
