@@ -137,24 +137,28 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         origin = mathutils.Matrix.Identity(4)
 
         for object in collection.objects:
-            object.select_set(True)
-
             if object.name == ".origin":
                 origin = object.matrix_world
-                object.select_set(False)
 
         precopy_prefix = ".precopy.:."
 
-        for object in context.selected_objects:
+        for object in objects:
             object.name = precopy_prefix + object.name
 
-        renamed = list(context.selected_objects)
+        hidden = {}
+
+        for object in collection.objects:
+            hidden[object.name] = object.hide_get()
+            object.hide_set(False)
+
+        for object in objects:
+            object.select_set(True)
+
+        renamed = list(objects)
 
         bpy.ops.object.duplicate()
-
+        
         for object in context.selected_objects:
-            object.name = object.name[len(precopy_prefix):]
-
             if object.type == "MESH":
                 continue
 
@@ -172,13 +176,11 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         merged = context.selected_objects[0]
         merged.name = collection.name
 
-        if props.bake and save_textures:
+        if props.bake:
             self.materialize(merged)
 
         if props.bake and save_textures:
             self.save_textures(merged, prefix)
-
-        hidden = {}
 
         # this needs a different approach entirely
         """bpy.ops.object.select_all(action="DESELECT")
@@ -206,8 +208,6 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
                 continue
 
             if object.type == "ARMATURE" or object.type == "EMPTY":
-                hidden[object.name] = object.hide_get()
-
                 object.hide_set(False)
                 object.select_set(True)
 
