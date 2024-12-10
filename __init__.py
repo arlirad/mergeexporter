@@ -28,6 +28,10 @@ class OBJECT_OT_MergeExportBake(bpy.types.Operator):
 
         #bake_mask(obj, self.get(prefix + ".mask"))
 
+        if texture_toggles.emission_toggle:
+            self.swap_to(context, self.get(prefix + ".emission"))
+            bpy.ops.object.bake(type="EMIT")
+
         return {'FINISHED'}
 
 
@@ -84,7 +88,7 @@ class OBJECT_OT_MergeExportBake(bpy.types.Operator):
             bpy.ops.image.new(name=name, width=self.size, height=self.size)
             image = images.get(name)
 
-            if not "albedo" in name:
+            if not "albedo" in name and not "emission" in name:
                 image.colorspace_settings.name = 'Non-Color'
 
             image.use_fake_user = True
@@ -129,17 +133,24 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         origin = mathutils.Matrix.Identity(4)
 
         for object in collection.objects:
+            object.select_set(True)
+
             if object.name == ".origin":
                 origin = object.matrix_world
+                object.select_set(False)
 
-        override = {}
-        override["active_object"] = objects[0]
-        override["selected_objects"] = objects
-
-        with context.temp_override(**override):
-            bpy.ops.object.duplicate()
+        precopy_prefix = ".precopy.:."
 
         for object in context.selected_objects:
+            object.name = precopy_prefix + object.name
+
+        renamed = list(context.selected_objects)
+
+        bpy.ops.object.duplicate()
+
+        for object in context.selected_objects:
+            object.name = object.name[len(precopy_prefix):]
+
             if object.type == "MESH":
                 continue
 
@@ -155,7 +166,6 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
             bpy.ops.object.join()
 
         merged = context.selected_objects[0]
-
         merged.name = collection.name
 
         if props.bake and save_textures:
@@ -166,7 +176,8 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
 
         hidden = {}
 
-        bpy.ops.object.select_all(action="DESELECT")
+        # this needs a different approach entirely
+        """bpy.ops.object.select_all(action="DESELECT")
 
         self.select_unmerges(collection)
         precopy_prefix = ".precopy.:."
@@ -182,11 +193,14 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         for object in context.selected_objects:
             object.name = object.name[len(precopy_prefix):-4]
 
-        unmerged = list(context.selected_objects)
+        unmerged = list(context.selected_objects)"""
 
         merged.select_set(True)
 
         for object in collection.objects:
+            if object.name == ".origin":
+                continue
+
             if object.type == "ARMATURE" or object.type == "EMPTY":
                 hidden[object.name] = object.hide_get()
 
@@ -194,6 +208,9 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
                 object.select_set(True)
 
         for object in context.selected_objects:
+            if object.name == ".origin":
+                continue
+
             object.matrix_world = origin.inverted() @ object.matrix_world
 
         if format == "gltf":
@@ -208,6 +225,9 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
             )
 
         for object in context.selected_objects:
+            if object.name == ".origin":
+                continue
+
             object.matrix_world = origin @ object.matrix_world
 
         bpy.ops.object.select_all(action="DESELECT")
@@ -217,8 +237,8 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
 
         merged.select_set(True)
 
-        for object in unmerged:
-            object.select_set(True)
+        """for object in unmerged:
+            object.select_set(True)"""
 
         bpy.ops.object.delete()
 
@@ -311,6 +331,9 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         if texture_toggles.rough_toggle:
             self.save_image(object.name + ".rough", prefix + object.name + ".rough" + format)
 
+        if texture_toggles.emission_toggle:
+            self.save_image(object.name + ".emission", prefix + object.name + ".emission" + format)
+
 
     def save_image(self, name, destination):
         original = bpy.data.images.get(name)
@@ -363,6 +386,10 @@ class TextureToggles(bpy.types.PropertyGroup):
     )
     mask_toggle: bpy.props.BoolProperty(
         name="Mask",
+        default=True,
+    )
+    emission_toggle: bpy.props.BoolProperty(
+        name="Emission",
         default=True,
     )
 
@@ -452,6 +479,9 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
             row = sub_layout.row()
             row.prop(my_settings.texture_toggles, "rough_toggle")
             row.prop(my_settings.texture_toggles, "mask_toggle")
+
+            row = sub_layout.row()
+            row.prop(my_settings.texture_toggles, "emission_toggle")
 
         row = layout.row().split(factor=0.33)
         row.label(text="Export Format")
