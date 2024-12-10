@@ -162,8 +162,18 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
         bpy.ops.object.select_all(action="DESELECT")
 
         self.select_unmerges(collection)
+        precopy_prefix = ".precopy.:."
+
+        for object in context.selected_objects:
+            object.name = precopy_prefix + object.name
+
+        renamed = list(context.selected_objects)
+
         bpy.ops.object.duplicate()
         self.apply_modifiers(context)
+
+        for object in context.selected_objects:
+            object.name = object.name[len(precopy_prefix):-4]
 
         unmerged = list(context.selected_objects)
 
@@ -204,6 +214,9 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
             object.select_set(True)
 
         bpy.ops.object.delete()
+
+        for object in renamed:
+            object.name = object.name[len(precopy_prefix):]
 
 
     def apply_modifiers(self, context):
