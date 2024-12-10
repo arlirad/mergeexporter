@@ -345,6 +345,7 @@ class OBJECT_OT_MergeExport(bpy.types.Operator):
     def save_image(self, name, destination):
         original = bpy.data.images.get(name)
         copy = original.copy()
+        copy.scale(original.size[0], original.size[1])
 
         tmp_buf = numpy.empty(original.size[0] * original.size[1] * 4, numpy.float32)
         original.pixels.foreach_get(tmp_buf)
