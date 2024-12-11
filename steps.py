@@ -10,6 +10,7 @@ class Step:
     original_names = []
     context = None
     collection = None
+    root = None
 
     def __init__(self, previous):
         if type(previous) == bpy.types.Context:
@@ -25,6 +26,7 @@ class Step:
         self.original_names = previous.original_names
         self.context = previous.context
         self.collection = previous.collection
+        self.root = previous.root
 
 
     def select(self, condition=None, list=None):
@@ -37,7 +39,12 @@ class Step:
         bpy.ops.object.select_all(action="DESELECT")
 
         for object in list:
-            object.select_set(condition(object))
+            try:
+                object.select_set(condition(object))
+            except ReferenceError:
+                pass
+            except:
+                raise
 
         if len(self.context.selected_objects) > 0:
             self.context.view_layer.objects.active = self.context.selected_objects[0]
@@ -51,8 +58,13 @@ class Step:
             condition = lambda obj : True
 
         for object in list:
-            if condition(object):
-                object.select_set(True)
+            try:
+                if condition(object):
+                    object.select_set(True)
+            except ReferenceError:
+                pass
+            except:
+                raise
 
         if len(self.context.selected_objects) > 0:
             self.context.view_layer.objects.active = self.context.selected_objects[0]
@@ -63,11 +75,12 @@ class Step:
 
 
 class InitialStep(Step):
-    def __init__(self, context, collection, objects):
+    def __init__(self, context, collection, root, objects):
         self.context = context
         self.collection = collection
         self.objects = objects
         self.objects_forward = self.objects
+        self.root = root
     
 
     def __enter__(self):
@@ -112,15 +125,25 @@ class UnrenameStep(Step):
 
     def __enter__(self):
         for entry in self.original_names:
-            self.previous_names.append((entry[0], entry[0].name))
-            entry[0].name = entry[1]
+            try:
+                self.previous_names.append((entry[0], entry[0].name))
+                entry[0].name = entry[1]
+            except ReferenceError:
+                pass
+            except:
+                raise
 
         return self
 
 
     def __exit__(self, *args):
         for entry in self.previous_names:
-            entry[0].name = entry[1]
+            try:
+                entry[0].name = entry[1]
+            except ReferenceError:
+                pass
+            except:
+                raise
 
 
 class BakeStep(Step):
@@ -137,6 +160,25 @@ class BakeStep(Step):
 
     def __exit__(self, *args):
         pass
+
+
+class DuplicateStep(Step):
+    to_delete = []
+
+    def __enter__(self):
+        self.select(lambda object : object.type == "MESH")
+        bpy.ops.object.duplicate()
+        self.to_delete = self.gather()
+
+        self.select_add(lambda object : object.type != "MESH")
+        self.objects_forward = self.gather()
+
+        return self
+
+
+    def __exit__(self, *args):
+        self.select(None, self.to_delete)
+        bpy.ops.object.delete()
 
 
 class ReoriginStep(Step):
@@ -176,15 +218,18 @@ class SaveTexturesStep(Step):
     def __enter__(self):
         if not self.context.scene.my_render_settings.save_textures:
             return self
+        
+        if not self.collection.merge_exporter_props.bake:
+            return self
 
-        props = self.collection.merge_exporter_props
+        props = self.root.merge_exporter_props
         prefix = os.path.abspath(bpy.path.abspath(props.path)) + "/"
 
         for object in self.objects:
             if object.type != "MESH":
                 continue
-
-            self.save_textures(object, prefix)
+            
+            self.save_textures(self.collection.name, prefix)
 
         return self
 
@@ -193,24 +238,24 @@ class SaveTexturesStep(Step):
         pass
 
 
-    def save_textures(self, object, path_prefix):
+    def save_textures(self, name, path_prefix):
         format = "." + bpy.context.scene.my_render_settings.export_texture_format
         texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
 
         if texture_toggles.albedo_toggle:
-            self.save_image(object.name + ".albedo", path_prefix + object.name + ".albedo" + format)
+            self.save_image(name + ".albedo", path_prefix + name + ".albedo" + format)
 
         if texture_toggles.normal_toggle:
-            self.save_image(object.name + ".normal", path_prefix + object.name + ".normal" + format)
+            self.save_image(name + ".normal", path_prefix + name + ".normal" + format)
 
         if texture_toggles.rough_toggle:
-            self.save_image(object.name + ".rough", path_prefix + object.name + ".rough" + format)
+            self.save_image(name + ".rough", path_prefix + name + ".rough" + format)
 
         if texture_toggles.emission_toggle:
-            self.save_image(object.name + ".emission", path_prefix + object.name + ".emission" + format)
+            self.save_image(name + ".emission", path_prefix + name + ".emission" + format)
 
         if texture_toggles.ao_toggle:
-            self.save_image(object.name + ".ao", path_prefix + object.name + ".ao" + format)
+            self.save_image(name + ".ao", path_prefix + name + ".ao" + format)
 
 
     def save_image(self, name, destination):
@@ -249,29 +294,28 @@ class ApplyModifiersStep(Step):
 
 
 class MergeMeshesStep(Step):
-    to_delete = []
-
     def __enter__(self):
         self.select(lambda object : object.type == "MESH")
-        bpy.ops.object.duplicate()
         bpy.ops.object.join()
-        self.to_delete = self.gather()
 
         self.select_add(lambda object : object.type != "MESH")
         self.objects_forward = self.gather()
+
+        name = self.collection.name
+
+        #if self.collection.merge_exporter_props.override_name:
+        #    name = self.collection.merge_exporter_props.name
 
         for object in self.objects_forward:
             if object.type != "MESH":
                 continue
 
-            object.name = self.collection.name
+            object.name = name
 
         return self
 
 
     def __exit__(self, *args):
-        self.select(None, self.to_delete)
-        bpy.ops.object.delete()
         pass
 
 
@@ -407,9 +451,10 @@ def execute_inner(context, objects, stack, root):
     parent_shared = entry[2]
 
     with (
-        InitialStep(context, collection, list(collection.objects)) as s,
+        InitialStep(context, collection, root, list(collection.objects)) as s,
         RenameStep(s) as s,
         BakeStep(s) as s,
+        DuplicateStep(s) as s,
         ApplyModifiersStep(s) as s,
         MergeMeshesStep(s) as s,
         MaterializeStep(s) as s,
@@ -427,6 +472,9 @@ def execute_inner(context, objects, stack, root):
             parent_object = parent_shared["parent_object"]
 
             for object in s.objects_forward:
+                if object.parent != "MESH":
+                    continue
+
                 object.parent = parent_object
                 object.matrix_parent_inverse = parent_object.matrix_world.inverted()
 
@@ -434,7 +482,7 @@ def execute_inner(context, objects, stack, root):
             return execute_inner(context, objects, stack, root)
         
         with (
-            InitialStep(context, root, list(objects)) as s,
+            InitialStep(context, root, root, list(objects)) as s,
             ReoriginStep(s) as s,
             ExportStep(s),
         ):

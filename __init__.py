@@ -126,6 +126,8 @@ class MergeExporter_CollectionProps(bpy.types.PropertyGroup):
     use_origin_scale: bpy.props.BoolProperty(name="Use Origin Scale", default=False)
     export_origin: bpy.props.BoolProperty(name="Export Origin", default=True)
     texture_size: bpy.props.IntProperty(name="Texture Size", default=2048)
+    override_name: bpy.props.BoolProperty(name="Override Name", default=False)
+    name: bpy.props.StringProperty(name="Name", default="merged")
 
 
 class TextureToggles(bpy.types.PropertyGroup):
@@ -162,6 +164,7 @@ class EntityList(bpy.types.UIList):
         row = layout.row()
         row.prop(collection.merge_exporter_props, "active", text="")
         row.label(text=collection.name, icon="OUTLINER_COLLECTION")
+        row.prop(collection.merge_exporter_props, "bake")
 
 
 class MyRenderSettings(bpy.types.PropertyGroup):
@@ -221,6 +224,14 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
 
                 if collection != None:
                     sub_layout = sub_panel[1]
+
+                    row = sub_layout.row()
+                    row.active = False
+                    column = row.column()
+                    column.prop(collection.merge_exporter_props, "override_name")
+                    column = row.column()
+                    column.prop(collection.merge_exporter_props, "name")
+                    column.active = collection.merge_exporter_props.override_name
 
                     row = sub_layout.row()
                     row.prop(collection.merge_exporter_props, "bake")
