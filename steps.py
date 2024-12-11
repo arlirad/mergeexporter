@@ -4,6 +4,11 @@ import numpy
 import os
 
 
+class StepShared:
+    encountered_data = {}
+    encountered_materials = {}
+
+
 class Step:
     objects = []
     objects_forward = []
@@ -11,6 +16,7 @@ class Step:
     context = None
     collection = None
     root = None
+    shared = None
 
     def __init__(self, previous):
         if type(previous) == bpy.types.Context:
@@ -27,6 +33,7 @@ class Step:
         self.context = previous.context
         self.collection = previous.collection
         self.root = previous.root
+        self.shared = previous.shared
 
 
     def select(self, condition=None, list=None):
@@ -75,12 +82,13 @@ class Step:
 
 
 class InitialStep(Step):
-    def __init__(self, context, collection, root, objects):
+    def __init__(self, context, collection, root, shared, objects):
         self.context = context
         self.collection = collection
         self.objects = objects
         self.objects_forward = self.objects
         self.root = root
+        self.shared = shared
     
 
     def __enter__(self):
@@ -117,7 +125,12 @@ class RenameStep(Step):
 
     def __exit__(self, *args):
         for entry in self.original_names:
-            entry[0].name = entry[1]
+            try:
+                entry[0].name = entry[1]
+            except ReferenceError:
+                pass
+            except:
+                raise
 
 
 class UnrenameStep(Step):
@@ -167,7 +180,7 @@ class DuplicateStep(Step):
 
     def __enter__(self):
         self.select(lambda object : object.type == "MESH")
-        bpy.ops.object.duplicate()
+        bpy.ops.object.duplicate(linked=True)
         self.to_delete = self.gather()
 
         self.select_add(lambda object : object.type != "MESH")
@@ -208,7 +221,12 @@ class ReoriginStep(Step):
         props = self.collection.merge_exporter_props
 
         for object in self.objects:
-            object.matrix_world = self.origin @ object.matrix_world
+            try:
+                object.matrix_world = self.origin @ object.matrix_world
+            except ReferenceError:
+                pass
+            except:
+                raise
 
         if props.origin:
             props.origin.matrix_world = self.origin_pure
@@ -277,7 +295,13 @@ class ApplyModifiersStep(Step):
             if object.type != "MESH":
                 continue
 
-            object.data = object.data.copy()
+            if object.data.name in self.shared.encountered_data:
+                object.data = self.shared.encountered_data[object.data.name]
+                continue
+            else:
+                name = object.data.name
+                object.data = object.data.copy()
+                self.shared.encountered_data[name] = object.data
 
             with bpy.context.temp_override(active_object=object, selected_objects={object}):
                 for i, mod in enumerate(object.modifiers):
@@ -341,12 +365,25 @@ class MaterializeStep(Step):
 
 
     def process(self, object):
+        print("processing: " + object.name)
+
         material_name = object.name + ".merged"
         texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
 
+        if object.data.name in self.shared.encountered_materials:
+            print("got a match!")
+            print(self.shared.encountered_materials[object.data.name])
+
+            object.data.materials.clear()
+            object.data.materials.append(self.shared.encountered_materials[object.data.name])
+
+            return
+        
         if not material_name in bpy.data.materials:
             mat = bpy.data.materials.new(name=material_name)
             mat.use_nodes = True
+
+            return
 
         mat = bpy.data.materials[material_name]
         node_tree = mat.node_tree
@@ -384,6 +421,8 @@ class MaterializeStep(Step):
             node_tree.links.new(node_rough_image.outputs[0], node_bsdf.inputs[2])
 
         node_tree.links.new(node_bsdf.outputs[0], node_output.inputs[0])
+
+        self.shared.encountered_materials[object.data.name] = mat
 
         object.data.materials.clear()
         object.data.materials.append(mat)
@@ -441,17 +480,22 @@ def execute(context, collection):
     if len(stack) == 0:
         return False
 
-    return execute_inner(context, [], stack, collection)
+    step_shared = StepShared()
+
+    return execute_inner(context, [], stack, collection, step_shared)
 
 
-def execute_inner(context, objects, stack, root):
+def execute_inner(context, objects, stack, root, step_shared):
     entry = stack.pop(0)
     collection = entry[0]
     shared = entry[1]
     parent_shared = entry[2]
 
+    print("working on")
+    print(collection)
+
     with (
-        InitialStep(context, collection, root, list(collection.objects)) as s,
+        InitialStep(context, collection, root, step_shared, list(collection.objects)) as s,
         RenameStep(s) as s,
         BakeStep(s) as s,
         DuplicateStep(s) as s,
@@ -479,10 +523,10 @@ def execute_inner(context, objects, stack, root):
                 object.matrix_parent_inverse = parent_object.matrix_world.inverted()
 
         if len(stack) > 0:
-            return execute_inner(context, objects, stack, root)
+            return execute_inner(context, objects, stack, root, step_shared)
         
         with (
-            InitialStep(context, root, root, list(objects)) as s,
+            InitialStep(context, root, root, step_shared, list(objects)) as s,
             ReoriginStep(s) as s,
             ExportStep(s),
         ):
