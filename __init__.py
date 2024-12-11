@@ -408,15 +408,17 @@ class TextureToggles(bpy.types.PropertyGroup):
 
 class EntityList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        collection = item.collection
         column = layout.column()
 
         row = column.row()
-        row.label(text=item.name, icon="OUTLINER_COLLECTION")
-        row.prop(item.merge_exporter_props, "active")
-        row.prop(item.merge_exporter_props, "bake")
+        row.label(text=collection.name, icon="OUTLINER_COLLECTION")
+        row.prop(collection.merge_exporter_props, "active")
+        row.prop(collection.merge_exporter_props, "bake")
 
 
 class MyRenderSettings(bpy.types.PropertyGroup):
+    collections: bpy.props.CollectionProperty(type=MergeExporter_Exportable, name="collections")
     entities: bpy.props.BoolProperty(name="entities", default=False)
     entity_details: bpy.props.BoolProperty(name="entity_details", default=False)
     textures: bpy.props.BoolProperty(name="textures", default=False)
@@ -460,7 +462,7 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
         if sub_panel[1]:
             sub_layout = sub_panel[1]
             row = sub_layout.row()
-            row.template_list("EntityList", "", bpy.context.scene.collection, "children", my_settings, "export_index")
+            row.template_list("EntityList", "", my_settings, "collections", my_settings, "export_index")
 
         sub_panel = layout.panel_prop(my_settings, "entity_details")
         sub_panel[0].label(text="Entity Details")
@@ -519,6 +521,19 @@ classes = [
     MyRenderSettings,
     RENDER_PT_MergeExporterPanel
 ]
+
+
+@bpy.app.handlers.persistent
+def depsgraph_update_post(dummy1, dummy2):
+    bpy.context.scene.my_render_settings.collections.clear()
+
+    for collection in bpy.context.scene.collection.children_recursive:
+        entry = bpy.context.scene.my_render_settings.collections.add()
+        entry.collection = collection
+
+
+bpy.app.handlers.depsgraph_update_post.append(depsgraph_update_post)
+
 
 def register():
     for cls in classes:
