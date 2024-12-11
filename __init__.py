@@ -2,9 +2,10 @@ import bpy
 import os
 import mathutils
 import math
-import numpy
+import steps
 
-class OBJECT_OT_MergeExportBake(bpy.types.Operator):
+
+class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
     bl_idname = "collection.merge_export_bake"
     bl_label = "Merge Export Bake"
     prefix: bpy.props.StringProperty(default="bake")
@@ -49,8 +50,6 @@ class OBJECT_OT_MergeExportBake(bpy.types.Operator):
 
             for slot in obj.material_slots:
                 material = slot.material
-
-                print(material.name)
 
                 if not material.use_nodes:
                     continue
@@ -101,281 +100,31 @@ class OBJECT_OT_MergeExportBake(bpy.types.Operator):
         return images.get(name)
 
 
-class OBJECT_OT_MergeExport(bpy.types.Operator):
-    bl_idname = "collection.merge_export"
+class FILE_OT_MergeExport(bpy.types.Operator):
+    bl_idname = "file.merge_export"
     bl_label = "Merge Export"
 
     def execute(self, context):
-        for collection in context.scene.collection.children:
-            if not collection.merge_exporter_props.active:
-                continue
-
-            #self.process(context, collection)
-            self.merge(context, collection, None)
+        with steps.PreserveSelectionsStep(context):
+            for collection in context.scene.collection.children:
+                steps.execute(context, collection)
 
         return {'FINISHED'}
 
 
-    def process(self, context, collection):
-        pass
-
-
-    def merge(self, context, collection, parent):
-        format = context.scene.my_render_settings.export_format
-        save_textures = context.scene.my_render_settings.save_textures
-
-        props = collection.merge_exporter_props
-        prefix = os.path.abspath(bpy.path.abspath(props.path)) + "/"
-        path = prefix + collection.name + "." + format
-
-        objects = list(collection.objects)
-        objects = [obj for obj in objects if obj.type != "ARMATURE" and obj.type != "EMPTY"]
-        bpy.context.view_layer.objects.active = objects[0]
-
-        bpy.ops.object.select_all(action="DESELECT")
-
-        origin = mathutils.Matrix.Identity(4)
-
-        for object in collection.objects:
-            if object.name == ".origin":
-                origin = object.matrix_world
-
-        precopy_prefix = ".precopy.:."
-
-        for object in objects:
-            object.name = precopy_prefix + object.name
-
-        hidden = {}
-
-        for object in collection.objects:
-            hidden[object.name] = object.hide_get()
-            object.hide_set(False)
-
-        for object in objects:
-            object.select_set(True)
-
-        renamed = list(objects)
-
-        bpy.ops.object.duplicate()
-        
-        for object in context.selected_objects:
-            if object.type == "MESH":
-                continue
-
-            with bpy.context.temp_override(active_object=context.selected_objects[0], selected_objects={context.selected_objects[0]}):
-                bpy.ops.object.convert()
-
-        if props.bake:
-            bpy.ops.collection.merge_export_bake(prefix=collection.name, size=props.texture_size)
-
-        self.apply_modifiers(context)
-
-        with bpy.context.temp_override(active_object=context.selected_objects[0], selected_objects={context.selected_objects[0]}):
-            bpy.ops.object.join()
-
-        merged = context.selected_objects[0]
-        merged.name = collection.name
-
-        if props.bake:
-            self.materialize(merged)
-
-        if props.bake and save_textures:
-            self.save_textures(merged, prefix)
-
-        # this needs a different approach entirely
-        """bpy.ops.object.select_all(action="DESELECT")
-
-        self.select_unmerges(collection)
-        precopy_prefix = ".precopy.:."
-
-        for object in context.selected_objects:
-            object.name = precopy_prefix + object.name
-
-        renamed = list(context.selected_objects)
-
-        bpy.ops.object.duplicate()
-        self.apply_modifiers(context)
-
-        for object in context.selected_objects:
-            object.name = object.name[len(precopy_prefix):-4]
-
-        unmerged = list(context.selected_objects)"""
-
-        merged.select_set(True)
-
-        for object in collection.objects:
-            if object.name == ".origin":
-                continue
-
-            if object.type == "ARMATURE" or object.type == "EMPTY":
-                object.hide_set(False)
-                object.select_set(True)
-
-        for object in context.selected_objects:
-            if object.name == ".origin":
-                continue
-
-            object.matrix_world = origin.inverted() @ object.matrix_world
-
-        if format == "gltf":
-            bpy.ops.export_scene.gltf(
-                filepath = path,
-                use_selection=True
-            )
-        else:
-            bpy.ops.export_scene.fbx(
-                filepath = path,
-                use_selection=True
-            )
-
-        for object in context.selected_objects:
-            if object.name == ".origin":
-                continue
-
-            object.matrix_world = origin @ object.matrix_world
-
-        bpy.ops.object.select_all(action="DESELECT")
-
-        for name in hidden:
-            collection.objects[name].hide_set(hidden[name])
-
-        merged.select_set(True)
-
-        """for object in unmerged:
-            object.select_set(True)"""
-
-        bpy.ops.object.delete()
-
-        for object in renamed:
-            object.name = object.name[len(precopy_prefix):]
-
-
-    def apply_modifiers(self, context):
-        for object in context.selected_objects:
-            object.data = object.data.copy()
-
-            with bpy.context.temp_override(active_object=object, selected_objects={object}):
-                for i, mod in enumerate(object.modifiers):
-                    if type(mod) is bpy.types.ArmatureModifier:
-                        continue
-
-                    bpy.ops.object.modifier_apply(modifier=mod.name)
-
-
-    def select_unmerges(self, collection):
-        for child in collection.children:
-            self.select_unmerges(child)
-
-            if child.name[0] != '.':
-                continue
-
-            for object in child.objects:
-                object.select_set(True)
-
-
-    def materialize(self, object):
-        material_name = object.name + ".merged"
-        texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
-
-        if not material_name in bpy.data.materials:
-            mat = bpy.data.materials.new(name=material_name)
-            mat.use_nodes = True
-
-        mat = bpy.data.materials[material_name]
-        node_tree = mat.node_tree
-
-        for node in node_tree.nodes:
-            node_tree.nodes.remove(node)
-
-        node_bsdf = node_tree.nodes.new(type='ShaderNodeBsdfPrincipled')
-        node_bsdf.location = (480, 0)
-
-        node_output = node_tree.nodes.new(type='ShaderNodeOutputMaterial')
-        node_output.location = (640, 0)
-
-        if texture_toggles.albedo_toggle:
-            node_albedo_image = node_tree.nodes.new(type='ShaderNodeTexImage')
-            node_albedo_image.location = (160, 270)
-            node_albedo_image.image = bpy.data.images.get(object.name + ".albedo")
-            node_tree.links.new(node_albedo_image.outputs[0], node_bsdf.inputs[0])
-
-        if texture_toggles.normal_toggle:
-            node_normalmap = node_tree.nodes.new(type='ShaderNodeNormalMap')
-            node_normalmap.location = (160, -270)
-
-            node_normal_image = node_tree.nodes.new(type='ShaderNodeTexImage')
-            node_normal_image.location = (-160, -270)
-            node_normal_image.image = bpy.data.images.get(object.name + ".normal")
-
-            node_tree.links.new(node_normal_image.outputs[0], node_normalmap.inputs[1])
-            node_tree.links.new(node_normalmap.outputs[0], node_bsdf.inputs[5])
-
-        if texture_toggles.rough_toggle:
-            node_rough_image = node_tree.nodes.new(type='ShaderNodeTexImage')
-            node_rough_image.location = (160, -810)
-            node_rough_image.image = bpy.data.images.get(object.name + ".rough")
-            node_tree.links.new(node_rough_image.outputs[0], node_bsdf.inputs[2])
-
-        node_tree.links.new(node_bsdf.outputs[0], node_output.inputs[0])
-
-        object.data.materials.clear()
-        object.data.materials.append(mat)
-
-
-    def save_textures(self, object, prefix):
-        format = "." + bpy.context.scene.my_render_settings.export_texture_format
-        texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
-
-        if texture_toggles.albedo_toggle:
-            self.save_image(object.name + ".albedo", prefix + object.name + ".albedo" + format)
-
-        if texture_toggles.normal_toggle:
-            self.save_image(object.name + ".normal", prefix + object.name + ".normal" + format)
-
-        if texture_toggles.rough_toggle:
-            self.save_image(object.name + ".rough", prefix + object.name + ".rough" + format)
-
-        if texture_toggles.emission_toggle:
-            self.save_image(object.name + ".emission", prefix + object.name + ".emission" + format)
-
-        if texture_toggles.ao_toggle:
-            self.save_image(object.name + ".ao", prefix + object.name + ".ao" + format)
-
-
-    def save_image(self, name, destination):
-        original = bpy.data.images.get(name)
-        copy = original.copy()
-        copy.scale(original.size[0], original.size[1])
-
-        tmp_buf = numpy.empty(original.size[0] * original.size[1] * 4, numpy.float32)
-        original.pixels.foreach_get(tmp_buf)
-        copy.pixels.foreach_set(tmp_buf)
-
-        copy.save(filepath=destination)
-        bpy.data.images.remove(copy)
-
-
 class MergeExporter_Exportable(bpy.types.PropertyGroup):
     collection: bpy.props.PointerProperty(type=bpy.types.Collection)
+    parent: bpy.props.PointerProperty(type=bpy.types.Collection)
 
 
 class MergeExporter_CollectionProps(bpy.types.PropertyGroup):
-    active: bpy.props.BoolProperty(
-        name="Active",
-        default=False,
-    )
-    bake: bpy.props.BoolProperty(
-        name="Bake",
-        default=True,
-    )
-    merge: bpy.props.BoolProperty(
-        name="Merge",
-        default=True,
-    )
-    path: bpy.props.StringProperty(
-        name="Export Path",
-        subtype='DIR_PATH',
-    )
+    active: bpy.props.BoolProperty(name="Active", default=False)
+    bake: bpy.props.BoolProperty(name="Bake", default=True)
+    materialize: bpy.props.BoolProperty(name="Materialize", default=True)
+    path: bpy.props.StringProperty(name="Export Path", subtype='DIR_PATH')
+    origin: bpy.props.PointerProperty(name="Origin", type=bpy.types.Object)
+    use_origin_scale: bpy.props.BoolProperty(name="Use Origin Scale", default=False)
+    export_origin: bpy.props.BoolProperty(name="Export Origin", default=True)
     texture_size: bpy.props.IntProperty(name="Texture Size", default=2048)
 
 
@@ -411,9 +160,8 @@ class EntityList(bpy.types.UIList):
         collection = item.collection
 
         row = layout.row()
+        row.prop(collection.merge_exporter_props, "active", text="")
         row.label(text=collection.name, icon="OUTLINER_COLLECTION")
-        row.prop(collection.merge_exporter_props, "active")
-        row.prop(collection.merge_exporter_props, "bake")
 
 
 class MyRenderSettings(bpy.types.PropertyGroup):
@@ -466,18 +214,32 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
         sub_panel = layout.panel_prop(my_settings, "entity_details")
         sub_panel[0].label(text="Entity Details")
         if sub_panel[1]:
-            collections = bpy.context.scene.collection.children
+            exportables = my_settings.collections
 
-            if my_settings.export_index < len(collections):
-                collection = bpy.context.scene.collection.children[my_settings.export_index]
+            if my_settings.export_index < len(exportables):
+                collection = exportables[my_settings.export_index].collection
 
                 if collection != None:
                     sub_layout = sub_panel[1]
+
                     row = sub_layout.row()
-                    row.prop(collection.merge_exporter_props, "path")
+                    row.prop(collection.merge_exporter_props, "bake")
+                    row.prop(collection.merge_exporter_props, "materialize")
 
                     row = sub_layout.row()
                     row.prop(collection.merge_exporter_props, "texture_size")
+
+                    row = sub_layout.row()
+                    row.prop(collection.merge_exporter_props, "path")
+                    if exportables[my_settings.export_index].parent:
+                        row.active = False
+
+                    row = sub_layout.row()
+                    column = row.column()
+                    column.prop(collection.merge_exporter_props, "export_origin")
+                    column.prop(collection.merge_exporter_props, "use_origin_scale")
+                    column = row.column()
+                    column.prop(collection.merge_exporter_props, "origin")
 
         sub_panel = layout.panel_prop(my_settings, "textures")
         sub_panel[0].label(text="Bake")
@@ -507,31 +269,43 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
         row.prop(my_settings, "save_textures", expand=True)
         row.prop(my_settings, "export_texture_format", expand=True)
 
-        layout.operator("collection.merge_export", text="Export")
+        layout.operator("file.merge_export", text="Export")
 
 
 classes = [
     MergeExporter_Exportable,
     MergeExporter_CollectionProps,
-    OBJECT_OT_MergeExportBake,
-    OBJECT_OT_MergeExport,
+    COLLECTION_OT_MergeExportBake,
+    FILE_OT_MergeExport,
     EntityList,
     TextureToggles,
     MyRenderSettings,
     RENDER_PT_MergeExporterPanel
 ]
 
+def menu_func_export(self, context):
+    self.layout.operator(FILE_OT_MergeExport.bl_idname, text="Merge Export (.glb, .fbx)")
+
+
+def gather(collection, parent):
+    entry = bpy.context.scene.my_render_settings.collections.add()
+    entry.collection = collection
+    entry.parent = parent
+
+    for child in collection.children:
+        gather(child, collection)
+
 
 @bpy.app.handlers.persistent
 def depsgraph_update_post(dummy1, dummy2):
     bpy.context.scene.my_render_settings.collections.clear()
 
-    for collection in bpy.context.scene.collection.children_recursive:
-        entry = bpy.context.scene.my_render_settings.collections.add()
-        entry.collection = collection
+    for collection in bpy.context.scene.collection.children:
+        gather(collection, None)
 
 
 bpy.app.handlers.depsgraph_update_post.append(depsgraph_update_post)
+
 
 
 def register():
@@ -540,12 +314,14 @@ def register():
 
     bpy.types.Collection.merge_exporter_props = bpy.props.PointerProperty(type=MergeExporter_CollectionProps)
     bpy.types.Scene.my_render_settings = bpy.props.PointerProperty(type=MyRenderSettings)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
     del bpy.types.Scene.my_render_settings
     del bpy.types.Collection.merge_exporter_props
 
