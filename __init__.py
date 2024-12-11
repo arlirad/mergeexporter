@@ -409,9 +409,8 @@ class TextureToggles(bpy.types.PropertyGroup):
 class EntityList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         collection = item.collection
-        column = layout.column()
 
-        row = column.row()
+        row = layout.row()
         row.label(text=collection.name, icon="OUTLINER_COLLECTION")
         row.prop(collection.merge_exporter_props, "active")
         row.prop(collection.merge_exporter_props, "bake")
