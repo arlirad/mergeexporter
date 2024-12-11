@@ -320,7 +320,9 @@ class ApplyModifiersStep(Step):
 class MergeMeshesStep(Step):
     def __enter__(self):
         self.select(lambda object : object.type == "MESH")
-        bpy.ops.object.join()
+
+        if len(self.context.selected_objects) > 1:
+            bpy.ops.object.join()
 
         self.select_add(lambda object : object.type != "MESH")
         self.objects_forward = self.gather()
@@ -366,6 +368,7 @@ class MaterializeStep(Step):
 
     def process(self, object):
         print("processing: " + object.name)
+        print(self.shared.encountered_materials)
 
         material_name = object.name + ".merged"
         texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
