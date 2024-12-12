@@ -56,12 +56,24 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
                     continue
 
                 nodes = material.node_tree.nodes
+
+                for node in nodes:
+                    node.select = False
+
                 tex_nodes = [node for node in nodes if node.type == 'TEX_IMAGE']
 
                 if len(tex_nodes) == 0:
                     continue
 
-                tex_nodes[0].image = image
+                for node in tex_nodes:
+                    if node.outputs[0].is_linked or node.outputs[1].is_linked:
+                        continue
+
+                    node.image = image
+                    node.select = True
+                    material.node_tree.nodes.active = node
+
+                    break
 
 
     def prepare_masker(self, context):
@@ -158,7 +170,7 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
                 image.colorspace_settings.name = 'Non-Color'
 
             image.use_fake_user = True
-            image.alpha_mode = "NONE"
+            # image.alpha_mode = "NONE"
 
         return images.get(name)
 

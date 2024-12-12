@@ -307,12 +307,13 @@ class ApplyModifiersStep(Step):
                     object.data = object.data.copy()
                     self.shared.encountered_data[name] = object.data
 
-                with bpy.context.temp_override(active_object=object, selected_objects={object}):
-                    for i, mod in enumerate(object.modifiers):
-                        if type(mod) is bpy.types.ArmatureModifier:
-                            continue
+                self.select(None, [object])
 
-                        bpy.ops.object.modifier_apply(modifier=mod.name)
+                for i, mod in enumerate(object.modifiers):
+                    if type(mod) is bpy.types.ArmatureModifier:
+                        continue
+
+                    bpy.ops.object.modifier_apply(modifier=mod.name)
             except ReferenceError:
                 pass
             except:
@@ -375,10 +376,12 @@ class MaterializeStep(Step):
 
 
     def process(self, object):
-        print("processing: " + object.name)
+        name = self.collection.name
+
+        print("processing: " + name)
         print(self.shared.encountered_materials)
 
-        material_name = object.name + ".merged"
+        material_name = name + ".merged"
         texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
 
         if object.data.name in self.shared.encountered_materials:
@@ -393,8 +396,6 @@ class MaterializeStep(Step):
         if not material_name in bpy.data.materials:
             mat = bpy.data.materials.new(name=material_name)
             mat.use_nodes = True
-
-            return
 
         mat = bpy.data.materials[material_name]
         node_tree = mat.node_tree
@@ -411,7 +412,7 @@ class MaterializeStep(Step):
         if texture_toggles.albedo_toggle:
             node_albedo_image = node_tree.nodes.new(type='ShaderNodeTexImage')
             node_albedo_image.location = (160, 270)
-            node_albedo_image.image = bpy.data.images.get(object.name + ".albedo")
+            node_albedo_image.image = bpy.data.images.get(name + ".albedo")
             node_tree.links.new(node_albedo_image.outputs[0], node_bsdf.inputs[0])
 
         if texture_toggles.normal_toggle:
@@ -420,7 +421,7 @@ class MaterializeStep(Step):
 
             node_normal_image = node_tree.nodes.new(type='ShaderNodeTexImage')
             node_normal_image.location = (-160, -270)
-            node_normal_image.image = bpy.data.images.get(object.name + ".normal")
+            node_normal_image.image = bpy.data.images.get(name + ".normal")
 
             node_tree.links.new(node_normal_image.outputs[0], node_normalmap.inputs[1])
             node_tree.links.new(node_normalmap.outputs[0], node_bsdf.inputs[5])
@@ -428,7 +429,7 @@ class MaterializeStep(Step):
         if texture_toggles.rough_toggle:
             node_rough_image = node_tree.nodes.new(type='ShaderNodeTexImage')
             node_rough_image.location = (160, -810)
-            node_rough_image.image = bpy.data.images.get(object.name + ".rough")
+            node_rough_image.image = bpy.data.images.get(name + ".rough")
             node_tree.links.new(node_rough_image.outputs[0], node_bsdf.inputs[2])
 
         node_tree.links.new(node_bsdf.outputs[0], node_output.inputs[0])
@@ -492,6 +493,8 @@ def execute(context, collection):
         return False
 
     step_shared = StepShared()
+    step_shared.encountered_data = {}
+    step_shared.encountered_materials = {}
 
     return execute_inner(context, [], stack, collection, step_shared)
 
