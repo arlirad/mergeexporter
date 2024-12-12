@@ -214,6 +214,9 @@ class ReoriginStep(Step):
         for object in self.objects:
             object.matrix_world = self.origin.inverted() @ object.matrix_world
 
+        if not props.export_origin:
+            self.objects_forward.remove(props.origin)
+
         return self
 
 
@@ -298,8 +301,15 @@ class ApplyModifiersStep(Step):
             if object.type != "MESH":
                 continue
 
+            has_mirror = False
+
             try:
-                if object.data.name in self.shared.encountered_data:
+                for i, mod in enumerate(object.modifiers):
+                    if type(mod) is bpy.types.MirrorModifier:
+                        has_mirror = True
+                        break
+
+                if object.data.name in self.shared.encountered_data and not has_mirror:
                     object.data = self.shared.encountered_data[object.data.name]
                     continue
                 else:
@@ -378,16 +388,10 @@ class MaterializeStep(Step):
     def process(self, object):
         name = self.collection.name
 
-        print("processing: " + name)
-        print(self.shared.encountered_materials)
-
         material_name = name + ".merged"
         texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
 
         if object.data.name in self.shared.encountered_materials:
-            print("got a match!")
-            print(self.shared.encountered_materials[object.data.name])
-
             object.data.materials.clear()
             object.data.materials.append(self.shared.encountered_materials[object.data.name])
 
@@ -449,9 +453,6 @@ class ExportStep(Step):
 
         self.select()
 
-        if props.origin and not props.export_origin:
-            props.origin.select_set(False)
-
         if format == "gltf":
             bpy.ops.export_scene.gltf(
                 filepath = path,
@@ -505,9 +506,6 @@ def execute_inner(context, objects, stack, root, step_shared):
     shared = entry[1]
     parent_shared = entry[2]
 
-    print("working on")
-    print(collection)
-
     with (
         InitialStep(context, collection, root, step_shared, list(collection.objects)) as s,
         RenameStep(s) as s,
@@ -518,6 +516,7 @@ def execute_inner(context, objects, stack, root, step_shared):
         MaterializeStep(s) as s,
         SaveTexturesStep(s) as s,
         UnrenameStep(s) as s,
+        ReoriginStep(s) as s,
     ):
         objects.extend(s.objects_forward)
 
@@ -529,19 +528,19 @@ def execute_inner(context, objects, stack, root, step_shared):
         if parent_shared:
             parent_object = parent_shared["parent_object"]
 
-            for object in s.objects_forward:
-                if object.parent != "MESH":
-                    continue
+            if parent_object:
+                for object in s.objects_forward:
+                    if object.parent != "MESH":
+                        continue
 
-                object.parent = parent_object
-                object.matrix_parent_inverse = parent_object.matrix_world.inverted()
+                    object.parent = parent_object
+                    object.matrix_parent_inverse = parent_object.matrix_world.inverted()
 
         if len(stack) > 0:
             return execute_inner(context, objects, stack, root, step_shared)
         
         with (
             InitialStep(context, root, root, step_shared, list(objects)) as s,
-            ReoriginStep(s) as s,
             ExportStep(s),
         ):
             return True

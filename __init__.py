@@ -232,7 +232,7 @@ class TextureToggles(bpy.types.PropertyGroup):
     )
 
 
-class EntityList(bpy.types.UIList):
+class MergeExporter_EntityList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         collection = item.collection
 
@@ -242,15 +242,23 @@ class EntityList(bpy.types.UIList):
         row.prop(collection.merge_exporter_props, "bake")
 
 
+class MergeExporter_ObjectList(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        row = layout.row()
+        row.label(text=item.name, icon="OBJECT_DATA")
+
+
 class MyRenderSettings(bpy.types.PropertyGroup):
     collections: bpy.props.CollectionProperty(type=MergeExporter_Exportable, name="collections")
     entities: bpy.props.BoolProperty(name="entities", default=False)
     entity_details: bpy.props.BoolProperty(name="entity_details", default=False)
-    textures: bpy.props.BoolProperty(name="textures", default=False)
     export_index: bpy.props.IntProperty(name="export_index")
+    textures: bpy.props.BoolProperty(name="textures", default=False)
     textures: bpy.props.BoolProperty(name="textures", default=False)
     material_count: bpy.props.IntProperty(name="Material Count", default=5)
     texture_toggles: bpy.props.PointerProperty(type=TextureToggles)
+    object_details: bpy.props.BoolProperty(name="object_details", default=False)
+    object_index: bpy.props.IntProperty(name="object_index")
     export_format: bpy.props.EnumProperty(
         name="Export Format",
         items=[
@@ -287,7 +295,7 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
         if sub_panel[1]:
             sub_layout = sub_panel[1]
             row = sub_layout.row()
-            row.template_list("EntityList", "", my_settings, "collections", my_settings, "export_index")
+            row.template_list("MergeExporter_EntityList", "", my_settings, "collections", my_settings, "export_index")
 
         sub_panel = layout.panel_prop(my_settings, "entity_details")
         sub_panel[0].label(text="Entity Details")
@@ -327,6 +335,13 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
                     column = row.column()
                     column.prop(collection.merge_exporter_props, "origin")
 
+                    sub_panel = layout.panel_prop(my_settings, "object_details")
+                    sub_panel[0].label(text="Object Details")
+                    if sub_panel[1]:
+                        sub_layout = sub_panel[1]
+                        row = sub_layout.row()
+                        row.template_list("MergeExporter_ObjectList", "", collection, "objects", my_settings, "object_index")
+
         sub_panel = layout.panel_prop(my_settings, "textures")
         sub_panel[0].label(text="Bake")
         if sub_panel[1]:
@@ -363,7 +378,8 @@ classes = [
     MergeExporter_CollectionProps,
     COLLECTION_OT_MergeExportBake,
     FILE_OT_MergeExport,
-    EntityList,
+    MergeExporter_EntityList,
+    MergeExporter_ObjectList,
     TextureToggles,
     MyRenderSettings,
     RENDER_PT_MergeExporterPanel
