@@ -412,7 +412,7 @@ class MaterializeStep(Step):
         if texture_toggles.albedo_toggle:
             node_albedo_image = node_tree.nodes.new(type='ShaderNodeTexImage')
             node_albedo_image.location = (160, 270)
-            node_albedo_image.image = bpy.data.images.get(name + ".albedo")
+            #node_albedo_image.image = bpy.data.images.get(name + ".albedo")
             node_tree.links.new(node_albedo_image.outputs[0], node_bsdf.inputs[0])
 
         if texture_toggles.normal_toggle:
@@ -421,7 +421,7 @@ class MaterializeStep(Step):
 
             node_normal_image = node_tree.nodes.new(type='ShaderNodeTexImage')
             node_normal_image.location = (-160, -270)
-            node_normal_image.image = bpy.data.images.get(name + ".normal")
+            #node_normal_image.image = bpy.data.images.get(name + ".normal")
 
             node_tree.links.new(node_normal_image.outputs[0], node_normalmap.inputs[1])
             node_tree.links.new(node_normalmap.outputs[0], node_bsdf.inputs[5])
@@ -429,7 +429,7 @@ class MaterializeStep(Step):
         if texture_toggles.rough_toggle:
             node_rough_image = node_tree.nodes.new(type='ShaderNodeTexImage')
             node_rough_image.location = (160, -810)
-            node_rough_image.image = bpy.data.images.get(name + ".rough")
+            #node_rough_image.image = bpy.data.images.get(name + ".rough")
             node_tree.links.new(node_rough_image.outputs[0], node_bsdf.inputs[2])
 
         node_tree.links.new(node_bsdf.outputs[0], node_output.inputs[0])
