@@ -27,7 +27,8 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
             self.swap_to(context, self.get(prefix + ".rough"))
             bpy.ops.object.bake(type="ROUGHNESS")
 
-        #bake_mask(obj, self.get(prefix + ".mask"))
+        if texture_toggles.rough_toggle:
+            self.bake_mask(context, self.get(prefix + ".mask"))
 
         if texture_toggles.emission_toggle:
             self.swap_to(context, self.get(prefix + ".emission"))
@@ -63,17 +64,79 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
                 tex_nodes[0].image = image
 
 
-    def bake_mask(self, obj, mask):
-        saved_materials = list(obj.data.materials)
+    def prepare_masker(self, context):
+        if not "masker" in bpy.data.materials:
+            masker = bpy.data.materials.new(name="masker")
+            masker.use_nodes = True
+            
+        masker = bpy.data.materials["masker"]
+        node_tree = masker.node_tree
+        divisor = context.scene.my_render_settings.material_count - 1
 
-        for i in range(0, len(obj.data.materials)):
-            obj.data.materials[i] = masker
+        for node in node_tree.nodes:
+            node_tree.nodes.remove(node)
+            
+        node_attribute = node_tree.nodes.new(type='ShaderNodeAttribute')
+        node_attribute.attribute_name = "material_index"
 
-        swap_to(obj, mask)
+        node_divide = node_tree.nodes.new(type='ShaderNodeMath')
+        node_divide.location = (160, 0)
+        node_divide.operation = 'DIVIDE'
+        node_divide.inputs[1].default_value = divisor
+
+        node_add = node_tree.nodes.new(type='ShaderNodeMath')
+        node_add.location = (320, 0)
+        node_add.operation = 'ADD'
+        node_add.inputs[1].default_value = 0.00 #(1.00 / divisor) / 3
+
+        node_clamp = node_tree.nodes.new(type='ShaderNodeClamp')
+        node_clamp.location = (480, 0)
+        node_clamp.inputs[1].default_value = 0.00
+        node_clamp.inputs[2].default_value = 1.00
+
+        node_combine = node_tree.nodes.new(type='ShaderNodeCombineColor')
+        node_combine.location = (640, 0)
+
+        node_diffuse = node_tree.nodes.new(type='ShaderNodeBsdfDiffuse')
+        node_diffuse.location = (800, 0)
+        node_diffuse.inputs[1].default_value = 1
+
+        node_output = node_tree.nodes.new(type='ShaderNodeOutputMaterial')
+        node_output.location = (960, 0)
+
+        node_image = node_tree.nodes.new(type='ShaderNodeTexImage')
+        node_image.location = (160, 270)
+
+        node_tree.links.new(node_attribute.outputs[2], node_divide.inputs[0])
+        node_tree.links.new(node_divide.outputs[0], node_add.inputs[0])
+        node_tree.links.new(node_add.outputs[0], node_clamp.inputs[0])
+        node_tree.links.new(node_clamp.outputs[0], node_combine.inputs[0])
+        node_tree.links.new(node_combine.outputs[0], node_diffuse.inputs[0])
+        node_tree.links.new(node_diffuse.outputs[0], node_output.inputs[0])
+
+        return masker
+
+
+    def bake_mask(self, context, mask):
+        saved_materials = {}
+        masker = self.prepare_masker(context)
+
+        for obj in context.selected_objects:
+            saved_materials[obj.name] = list(obj.data.materials)
+
+        for obj in context.selected_objects:
+            for i in range(0, len(obj.data.materials)):
+                obj.data.materials[i] = masker
+
+            self.swap_to(context, mask)
+        
         bpy.ops.object.bake(type="DIFFUSE")
 
-        for i in range(0, len(obj.data.materials)):
-            obj.data.materials[i] = saved_materials[i]
+        for obj in context.selected_objects:
+            mats = saved_materials[obj.name]
+
+            for i in range(0, len(obj.data.materials)):
+                obj.data.materials[i] = mats[i]
 
 
     def get(self, name):
@@ -91,7 +154,7 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
             bpy.ops.image.new(name=name, width=self.size, height=self.size)
             image = images.get(name)
 
-            if "normal" in name or "rough" in name:
+            if "normal" in name or "rough" in name or "mask" in name:
                 image.colorspace_settings.name = 'Non-Color'
 
             image.use_fake_user = True
@@ -174,7 +237,7 @@ class MyRenderSettings(bpy.types.PropertyGroup):
     textures: bpy.props.BoolProperty(name="textures", default=False)
     export_index: bpy.props.IntProperty(name="export_index")
     textures: bpy.props.BoolProperty(name="textures", default=False)
-    material_count: bpy.props.IntProperty(name="Material Count", default=4)
+    material_count: bpy.props.IntProperty(name="Material Count", default=5)
     texture_toggles: bpy.props.PointerProperty(type=TextureToggles)
     export_format: bpy.props.EnumProperty(
         name="Export Format",

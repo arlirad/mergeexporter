@@ -269,6 +269,9 @@ class SaveTexturesStep(Step):
         if texture_toggles.rough_toggle:
             self.save_image(name + ".rough", path_prefix + name + ".rough" + format)
 
+        if texture_toggles.mask_toggle:
+            self.save_image(name + ".mask", path_prefix + name + ".mask" + format)
+
         if texture_toggles.emission_toggle:
             self.save_image(name + ".emission", path_prefix + name + ".emission" + format)
 
@@ -295,20 +298,25 @@ class ApplyModifiersStep(Step):
             if object.type != "MESH":
                 continue
 
-            if object.data.name in self.shared.encountered_data:
-                object.data = self.shared.encountered_data[object.data.name]
-                continue
-            else:
-                name = object.data.name
-                object.data = object.data.copy()
-                self.shared.encountered_data[name] = object.data
+            try:
+                if object.data.name in self.shared.encountered_data:
+                    object.data = self.shared.encountered_data[object.data.name]
+                    continue
+                else:
+                    name = object.data.name
+                    object.data = object.data.copy()
+                    self.shared.encountered_data[name] = object.data
 
-            with bpy.context.temp_override(active_object=object, selected_objects={object}):
-                for i, mod in enumerate(object.modifiers):
-                    if type(mod) is bpy.types.ArmatureModifier:
-                        continue
+                with bpy.context.temp_override(active_object=object, selected_objects={object}):
+                    for i, mod in enumerate(object.modifiers):
+                        if type(mod) is bpy.types.ArmatureModifier:
+                            continue
 
-                    bpy.ops.object.modifier_apply(modifier=mod.name)
+                        bpy.ops.object.modifier_apply(modifier=mod.name)
+            except ReferenceError:
+                pass
+            except:
+                raise
 
         return self
 
