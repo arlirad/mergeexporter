@@ -471,6 +471,45 @@ class ExportStep(Step):
         pass
 
 
+class ReparentStep(Step):
+    original_parents = []
+
+    def __enter__(self):
+        self.select(lambda obj : obj.type == "MESH")
+        objs = self.gather()
+
+        if len(objs) == 0:
+            return self
+
+        root = objs[0]
+
+        for object in self.objects:
+            if object.parent and object.type != "MESH":
+                continue
+
+            if object == root:
+                continue
+
+            self.original_parents.append((object, object.parent))
+            object.parent = root
+            object.matrix_parent_inverse = root.matrix_world.inverted()
+
+        return self
+
+
+    def __exit__(self, *args):
+        for entry in self.original_parents:
+            try:
+                entry[0].parent = entry[1]
+
+                if entry[1]:
+                    entry[0].matrix_parent_inverse = entry[1].matrix_world.inverted()
+            except ReferenceError:
+                pass
+            except:
+                raise
+
+
 def gather(collection, stack, parent_shared):
     if not collection.merge_exporter_props.active:
         return
@@ -517,6 +556,7 @@ def execute_inner(context, objects, stack, root, step_shared):
         SaveTexturesStep(s) as s,
         UnrenameStep(s) as s,
         ReoriginStep(s) as s,
+        ReparentStep(s) as s,
     ):
         objects.extend(s.objects_forward)
 
