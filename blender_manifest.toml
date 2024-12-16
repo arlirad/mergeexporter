@@ -1,0 +1,27 @@
+schema_version = "1.0.0"
+
+id = "mergeexporter"
+version = "1.0.0"
+name = "Merge Exporter"
+tagline = "An extension to simplify exporting and merging objects together"
+maintainer = "Arlirad <arlirad.ndv@gmail.com>"
+type = "add-on"
+
+tags = ["Bake", "Import-Export", "Mesh", "User Interface", "Pipeline"]
+
+blender_version_min = "4.2.0"
+# # Optional: Blender version that the extension does not support, earlier versions are supported.
+# # This can be omitted and defined later on the extensions platform if an issue is found.
+# blender_version_max = "5.1.0"
+
+# License conforming to https://spdx.org/licenses/ (use "SPDX: prefix)
+# https://docs.blender.org/manual/en/dev/advanced/extensions/licenses.html
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+copyright = [
+  "2024 Arlirad"
+]
+
+[permissions]
+files = "Export GLTF/FBX to disk"
