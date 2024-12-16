@@ -237,7 +237,7 @@ class ReoriginStep(Step):
 
 class SaveTexturesStep(Step):
     def __enter__(self):
-        if not self.context.scene.my_render_settings.save_textures:
+        if not self.context.scene.merge_exporter_settings.save_textures:
             return self
         
         if not self.collection.merge_exporter_props.bake:
@@ -260,8 +260,8 @@ class SaveTexturesStep(Step):
 
 
     def save_textures(self, name, path_prefix):
-        format = "." + bpy.context.scene.my_render_settings.export_texture_format
-        texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
+        format = "." + bpy.context.scene.merge_exporter_settings.export_texture_format
+        texture_toggles = bpy.context.scene.merge_exporter_settings.texture_toggles
 
         if texture_toggles.albedo_toggle:
             self.save_image(name + ".albedo", path_prefix + name + ".albedo" + format)
@@ -366,7 +366,7 @@ class MergeMeshesStep(Step):
 
 class MaterializeStep(Step):
     def __enter__(self):
-        format = self.context.scene.my_render_settings.export_format
+        format = self.context.scene.merge_exporter_settings.export_format
         props = self.collection.merge_exporter_props
         
         if not props.materialize:
@@ -389,7 +389,7 @@ class MaterializeStep(Step):
         name = self.collection.name
 
         material_name = name + ".merged"
-        texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
+        texture_toggles = bpy.context.scene.merge_exporter_settings.texture_toggles
 
         if object.data.name in self.shared.encountered_materials:
             object.data.materials.clear()
@@ -446,7 +446,7 @@ class MaterializeStep(Step):
 
 class ExportStep(Step):
     def __enter__(self):
-        format = self.context.scene.my_render_settings.export_format
+        format = self.context.scene.merge_exporter_settings.export_format
         props = self.collection.merge_exporter_props
         prefix = os.path.abspath(bpy.path.abspath(props.path)) + "/"
         path = prefix + self.collection.name + "." + format

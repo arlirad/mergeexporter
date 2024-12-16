@@ -14,7 +14,7 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
 
     def execute(self, context):
         prefix = self.prefix
-        texture_toggles = bpy.context.scene.my_render_settings.texture_toggles
+        texture_toggles = bpy.context.scene.merge_exporter_settings.texture_toggles
 
         if texture_toggles.albedo_toggle:
             self.swap_to(context, self.get(prefix + ".albedo"))
@@ -84,7 +84,7 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
             
         masker = bpy.data.materials["masker"]
         node_tree = masker.node_tree
-        divisor = context.scene.my_render_settings.material_count - 1
+        divisor = context.scene.merge_exporter_settings.material_count - 1
 
         for node in node_tree.nodes:
             node_tree.nodes.remove(node)
@@ -205,7 +205,7 @@ class MergeExporter_CollectionProps(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name", default="merged")
 
 
-class TextureToggles(bpy.types.PropertyGroup):
+class MergeExporter_TextureToggles(bpy.types.PropertyGroup):
     albedo_toggle: bpy.props.BoolProperty(
         name="Albedo",
         default=True,
@@ -232,7 +232,7 @@ class TextureToggles(bpy.types.PropertyGroup):
     )
 
 
-class MergeExporter_EntityList(bpy.types.UIList):
+class COLLECTION_UL_MergeExporter_EntityList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         collection = item.collection
 
@@ -242,13 +242,13 @@ class MergeExporter_EntityList(bpy.types.UIList):
         row.prop(collection.merge_exporter_props, "bake")
 
 
-class MergeExporter_ObjectList(bpy.types.UIList):
+class OBJECT_UL_MergeExporter_ObjectList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         row = layout.row()
         row.label(text=item.name, icon="OBJECT_DATA")
 
 
-class MyRenderSettings(bpy.types.PropertyGroup):
+class MergeExporter_SettingsSettings(bpy.types.PropertyGroup):
     collections: bpy.props.CollectionProperty(type=MergeExporter_Exportable, name="collections")
     entities: bpy.props.BoolProperty(name="entities", default=False)
     entity_details: bpy.props.BoolProperty(name="entity_details", default=False)
@@ -256,7 +256,7 @@ class MyRenderSettings(bpy.types.PropertyGroup):
     textures: bpy.props.BoolProperty(name="textures", default=False)
     textures: bpy.props.BoolProperty(name="textures", default=False)
     material_count: bpy.props.IntProperty(name="Material Count", default=5)
-    texture_toggles: bpy.props.PointerProperty(type=TextureToggles)
+    texture_toggles: bpy.props.PointerProperty(type=MergeExporter_TextureToggles)
     object_details: bpy.props.BoolProperty(name="object_details", default=False)
     object_index: bpy.props.IntProperty(name="object_index")
     export_format: bpy.props.EnumProperty(
@@ -288,14 +288,14 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        my_settings = context.scene.my_render_settings
+        my_settings = context.scene.merge_exporter_settings
 
         sub_panel = layout.panel_prop(my_settings, "entities")
         sub_panel[0].label(text="Entities")
         if sub_panel[1]:
             sub_layout = sub_panel[1]
             row = sub_layout.row()
-            row.template_list("MergeExporter_EntityList", "", my_settings, "collections", my_settings, "export_index")
+            row.template_list("COLLECTION_UL_MergeExporter_EntityList", "", my_settings, "collections", my_settings, "export_index")
 
         sub_panel = layout.panel_prop(my_settings, "entity_details")
         sub_panel[0].label(text="Entity Details")
@@ -340,7 +340,7 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
                     if sub_panel[1]:
                         sub_layout = sub_panel[1]
                         row = sub_layout.row()
-                        row.template_list("MergeExporter_ObjectList", "", collection, "objects", my_settings, "object_index")
+                        row.template_list("OBJECT_UL_MergeExporter_ObjectList", "", collection, "objects", my_settings, "object_index")
 
         sub_panel = layout.panel_prop(my_settings, "textures")
         sub_panel[0].label(text="Bake")
@@ -378,10 +378,10 @@ classes = [
     MergeExporter_CollectionProps,
     COLLECTION_OT_MergeExportBake,
     FILE_OT_MergeExport,
-    MergeExporter_EntityList,
-    MergeExporter_ObjectList,
-    TextureToggles,
-    MyRenderSettings,
+    COLLECTION_UL_MergeExporter_EntityList,
+    OBJECT_UL_MergeExporter_ObjectList,
+    MergeExporter_TextureToggles,
+    MergeExporter_SettingsSettings,
     RENDER_PT_MergeExporterPanel
 ]
 
@@ -390,7 +390,7 @@ def menu_func_export(self, context):
 
 
 def gather(collection, parent):
-    entry = bpy.context.scene.my_render_settings.collections.add()
+    entry = bpy.context.scene.merge_exporter_settings.collections.add()
     entry.collection = collection
     entry.parent = parent
 
@@ -400,7 +400,7 @@ def gather(collection, parent):
 
 @bpy.app.handlers.persistent
 def depsgraph_update_post(dummy1, dummy2):
-    bpy.context.scene.my_render_settings.collections.clear()
+    bpy.context.scene.merge_exporter_settings.collections.clear()
 
     for collection in bpy.context.scene.collection.children:
         gather(collection, None)
@@ -415,7 +415,7 @@ def register():
         bpy.utils.register_class(cls)
 
     bpy.types.Collection.merge_exporter_props = bpy.props.PointerProperty(type=MergeExporter_CollectionProps)
-    bpy.types.Scene.my_render_settings = bpy.props.PointerProperty(type=MyRenderSettings)
+    bpy.types.Scene.merge_exporter_settings = bpy.props.PointerProperty(type=MergeExporter_SettingsSettings)
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
@@ -424,7 +424,7 @@ def unregister():
         bpy.utils.unregister_class(cls)
 
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
-    del bpy.types.Scene.my_render_settings
+    del bpy.types.Scene.merge_exporter_settings
     del bpy.types.Collection.merge_exporter_props
 
 
