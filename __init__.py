@@ -1,8 +1,9 @@
+from . import steps
+
 import bpy
 import os
 import mathutils
 import math
-import steps
 
 
 class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
@@ -180,9 +181,8 @@ class FILE_OT_MergeExport(bpy.types.Operator):
     bl_label = "Merge Export"
 
     def execute(self, context):
-        with steps.PreserveSelectionsStep(context):
-            for collection in context.scene.collection.children:
-                steps.execute(context, collection)
+        for collection in context.scene.collection.children:
+            steps.execute(context, collection)
 
         return {'FINISHED'}
 

@@ -536,7 +536,8 @@ def execute(context, collection):
     step_shared.encountered_data = {}
     step_shared.encountered_materials = {}
 
-    return execute_inner(context, [], stack, collection, step_shared)
+    with PreserveSelectionsStep(context):
+        return execute_inner(context, [], stack, collection, step_shared)
 
 
 def execute_inner(context, objects, stack, root, step_shared):
