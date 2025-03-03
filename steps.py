@@ -179,7 +179,13 @@ class DuplicateStep(Step):
     to_delete = []
 
     def __enter__(self):
-        self.select(lambda object : object.type == "MESH")
+        props = self.collection.merge_exporter_props
+
+        if not props.export_origin:
+            self.select(lambda object : object.type == "MESH" and object != props.origin)
+        else:
+            self.select(lambda object : object.type == "MESH")
+            
         bpy.ops.object.duplicate(linked=True)
         self.to_delete = self.gather()
 
@@ -213,9 +219,6 @@ class ReoriginStep(Step):
 
         for object in self.objects:
             object.matrix_world = self.origin.inverted() @ object.matrix_world
-
-        if not props.export_origin:
-            self.objects_forward.remove(props.origin)
 
         return self
 
