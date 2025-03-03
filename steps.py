@@ -461,7 +461,8 @@ class ExportStep(Step):
         else:
             bpy.ops.export_scene.fbx(
                 filepath = path,
-                use_selection=True
+                use_selection=True,
+                apply_scale_options="FBX_SCALE_ALL",
             )
 
         return self
@@ -484,7 +485,10 @@ class ReparentStep(Step):
         root = objs[0]
 
         for object in self.objects:
-            if object.parent and object.type != "MESH":
+            if object.parent:
+                continue
+
+            if object.type != "MESH" and object.type != "EMPTY":
                 continue
 
             if object == root:

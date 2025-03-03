@@ -1,4 +1,7 @@
-from . import steps
+if __name__ == "mergeexporter":
+    import steps
+else:
+    from . import steps
 
 import bpy
 import os
