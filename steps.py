@@ -5,21 +5,22 @@ import os
 
 
 class StepShared:
-    encountered_data = {}
-    encountered_materials = {}
+    def __init__(self):
+        self.encountered_data = {}
+        self.encountered_materials = {}
 
 
 class Step:
-    objects = []
-    objects_forward = []
-    original_names = []
-    duplicated_sources = []
-    context = None
-    collection = None
-    root = None
-    shared = None
-
     def __init__(self, previous):
+        self.objects = []
+        self.objects_forward = []
+        self.original_names = []
+        self.duplicated_sources = []
+        self.context = None
+        self.collection = None
+        self.root = None
+        self.shared = None
+
         if type(previous) == bpy.types.Context:
             self.context = previous
             return
@@ -85,6 +86,8 @@ class Step:
 
 class InitialStep(Step):
     def __init__(self, context, collection, root, shared, objects):
+        super().__init__([])
+
         self.context = context
         self.collection = collection
         self.objects = objects
@@ -102,7 +105,10 @@ class InitialStep(Step):
 
 
 class PreserveSelectionsStep(Step):
-    selections = []
+    def __init__(self, previous):
+        super().__init__(previous)
+        self.selections = []
+        
 
     def __enter__(self):
         self.selections = self.gather()
@@ -136,8 +142,11 @@ class RenameStep(Step):
 
 
 class UnrenameStep(Step):
-    previous_names = []
+    def __init__(self, previous):
+        super().__init__(previous)
+        self.previous_names = []
 
+    
     def __enter__(self):
         for entry in self.original_names:
             try:
@@ -178,7 +187,10 @@ class BakeStep(Step):
 
 
 class DuplicateStep(Step):
-    to_delete = []
+    def __init__(self, previous):
+        super().__init__(previous)
+        self.to_delete = []
+
 
     def __enter__(self):
         props = self.collection.merge_exporter_props
@@ -187,7 +199,7 @@ class DuplicateStep(Step):
             self.select(lambda object : object.type == "MESH" and object != props.origin)
         else:
             self.select(lambda object : object.type == "MESH")
-            
+
         objects = self.gather()
         duplicated = []
 
@@ -221,8 +233,6 @@ class CopyShapeKeysStep(Step):
 
             if len(source.data.shape_keys.key_blocks) == 0:
                 continue
-
-            print(destination.data)
 
             if destination.data.shape_keys == None:
                 src_name = source.data.shape_keys.key_blocks[0].name
@@ -320,8 +330,11 @@ class DeleteShapeKeysStep(Step):
 
 
 class ReoriginStep(Step):
-    origin = mathutils.Matrix.Identity(4)
-    origin_pure = None
+    def __init__(self, previous):
+        super().__init__(previous)
+
+        self.origin = mathutils.Matrix.Identity(4)
+        self.origin_pure = None
 
     def __enter__(self):
         props = self.collection.merge_exporter_props
@@ -595,7 +608,10 @@ class ExportStep(Step):
 
 
 class ReparentStep(Step):
-    original_parents = []
+    def __init__(self, previous):
+        super().__init__(previous)
+        self.original_parents = []
+
 
     def __enter__(self):
         self.select(lambda obj : obj.type == "MESH")
