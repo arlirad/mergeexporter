@@ -149,25 +149,15 @@ class UnrenameStep(Step):
     
     def __enter__(self):
         for entry in self.original_names:
-            try:
-                self.previous_names.append((entry[0], entry[0].name))
-                entry[0].name = entry[1]
-            except ReferenceError:
-                pass
-            except:
-                raise
+            self.previous_names.append((entry[0], entry[0].name))
+            entry[0].name = entry[1]
 
         return self
 
 
     def __exit__(self, *args):
         for entry in self.previous_names:
-            try:
-                entry[0].name = entry[1]
-            except ReferenceError:
-                pass
-            except:
-                raise
+            entry[0].name = entry[1]
 
 
 class BakeStep(Step):
@@ -187,11 +177,6 @@ class BakeStep(Step):
 
 
 class DuplicateStep(Step):
-    def __init__(self, previous):
-        super().__init__(previous)
-        self.to_delete = []
-
-
     def __enter__(self):
         props = self.collection.merge_exporter_props
 
@@ -212,17 +197,15 @@ class DuplicateStep(Step):
             self.duplicated_sources.append((object_dup, object))
 
         self.select(None, duplicated)
-        self.to_delete = self.gather()
-
         self.select_add(lambda object : object.type != "MESH")
+
         self.objects_forward = self.gather()
 
         return self
-
+    
 
     def __exit__(self, *args):
-        self.select(None, self.to_delete)
-        bpy.ops.object.delete()
+        pass
 
 
 class CopyShapeKeysStep(Step):
@@ -230,6 +213,9 @@ class CopyShapeKeysStep(Step):
         for pair in self.duplicated_sources:
             destination = pair[0]
             source = pair[1]
+
+            if source.data.shape_keys == None:
+                continue
 
             if len(source.data.shape_keys.key_blocks) == 0:
                 continue
@@ -305,6 +291,9 @@ class DeleteShapeKeysStep(Step):
             if object.type != "MESH":
                 continue
 
+            if object.data.shape_keys == None:
+                continue
+
             if len(object.data.shape_keys.key_blocks) == 0:
                 continue
 
@@ -325,7 +314,7 @@ class DeleteShapeKeysStep(Step):
     def remove_shapekeys(self, object):
         blocks = object.data.shape_keys.key_blocks
 
-        for block in blocks:
+        for block in reversed(blocks):
             object.shape_key_remove(block)
 
 
@@ -359,12 +348,7 @@ class ReoriginStep(Step):
         props = self.collection.merge_exporter_props
 
         for object in self.objects:
-            try:
-                object.matrix_world = self.origin @ object.matrix_world
-            except ReferenceError:
-                pass
-            except:
-                raise
+            object.matrix_world = self.origin @ object.matrix_world
 
         if props.origin:
             props.origin.matrix_world = self.origin_pure
@@ -472,11 +456,18 @@ class ApplyModifiersStep(Step):
 
 
 class MergeMeshesStep(Step):
+    def __init__(self, previous):
+        super().__init__(previous)
+        self.to_delete = []
+    
+
     def __enter__(self):
         self.select(lambda object : object.type == "MESH")
 
         if len(self.context.selected_objects) > 1:
             bpy.ops.object.join()
+            
+        self.to_delete = self.gather()
 
         self.select_add(lambda object : object.type != "MESH")
         self.objects_forward = self.gather()
@@ -496,7 +487,8 @@ class MergeMeshesStep(Step):
 
 
     def __exit__(self, *args):
-        pass
+        self.select(None, self.to_delete)
+        bpy.ops.object.delete()
 
 
 class MaterializeStep(Step):
@@ -641,15 +633,10 @@ class ReparentStep(Step):
 
     def __exit__(self, *args):
         for entry in self.original_parents:
-            try:
-                entry[0].parent = entry[1]
+            entry[0].parent = entry[1]
 
-                if entry[1]:
-                    entry[0].matrix_parent_inverse = entry[1].matrix_world.inverted()
-            except ReferenceError:
-                pass
-            except:
-                raise
+            if entry[1]:
+                entry[0].matrix_parent_inverse = entry[1].matrix_world.inverted()
 
 
 def gather(collection, stack, parent_shared):
