@@ -459,6 +459,8 @@ class MergeMeshesStep(Step):
     def __init__(self, previous):
         super().__init__(previous)
         self.to_delete = []
+        self.renamed_object = None
+        self.renamed_original_name = None
     
 
     def __enter__(self):
@@ -477,6 +479,14 @@ class MergeMeshesStep(Step):
         #if self.collection.merge_exporter_props.override_name:
         #    name = self.collection.merge_exporter_props.name
 
+        if name in bpy.context.scene.objects:
+            to_rename = bpy.context.scene.objects[name]
+
+            self.renamed_object = to_rename
+            self.renamed_original_name = to_rename.name
+            
+            to_rename.name = "...:..." + to_rename.name
+
         for object in self.objects_forward:
             if object.type != "MESH":
                 continue
@@ -489,6 +499,9 @@ class MergeMeshesStep(Step):
     def __exit__(self, *args):
         self.select(None, self.to_delete)
         bpy.ops.object.delete()
+
+        if self.renamed_object != None:
+            self.renamed_object.name = self.renamed_original_name
 
 
 class MaterializeStep(Step):
