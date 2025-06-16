@@ -155,15 +155,17 @@ class PreserveSelectionsStep(Step):
         
 
     def __enter__(self):
-        self.object = bpy.ops.object
-        self.selections = self.gather()
+        self.object = bpy.context.view_layer.objects.active
+        self.selections = self.context.selected_objects.copy()
 
         return self
 
 
     def __exit__(self, *args):
-        self.select(None, reversed(self.selections))
-        bpy.ops.object = self.object
+        self.select(None, self.selections)
+
+        if self.object != None:
+            bpy.context.view_layer.objects.active = self.object
 
 
 class RenameStep(Step):
