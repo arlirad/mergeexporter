@@ -104,19 +104,66 @@ class InitialStep(Step):
         pass
 
 
-class PreserveSelectionsStep(Step):
+class ObjectModeStep(Step):
     def __init__(self, previous):
         super().__init__(previous)
-        self.selections = []
-        
+        self.mode = None
+
 
     def __enter__(self):
-        self.selections = self.gather()
+        if bpy.context.object:
+            self.mode = bpy.context.object.mode
+            bpy.ops.object.mode_set(mode='OBJECT')
+
         return self
 
 
     def __exit__(self, *args):
-        self.select(None, self.selections)
+        if self.mode != None:
+            bpy.ops.object.mode_set(mode=self.mode)
+
+
+class UnhideStep(Step):
+    def __init__(self, previous):
+        super().__init__(previous)
+        self.visibilities = []
+
+
+    def __enter__(self):
+        for object in self.objects:
+            self.visibilities.append((object, object.hide_get(), object.hide_viewport, object.hide_render))
+            
+            object.hide_set(False)
+            object.hide_viewport = False
+            object.hide_render = False
+
+        return self
+
+
+    def __exit__(self, *args):
+        for visibility in self.visibilities:
+            visibility[0].hide_set(visibility[1])
+            visibility[0].hide_viewport = visibility[2]
+            visibility[0].hide_render = visibility[3]
+
+
+class PreserveSelectionsStep(Step):
+    def __init__(self, previous):
+        super().__init__(previous)
+        self.selections = []
+        self.object = None
+        
+
+    def __enter__(self):
+        self.object = bpy.ops.object
+        self.selections = self.gather()
+
+        return self
+
+
+    def __exit__(self, *args):
+        self.select(None, reversed(self.selections))
+        bpy.ops.object = self.object
 
 
 class RenameStep(Step):
@@ -678,7 +725,10 @@ def execute(context, collection):
     step_shared.encountered_data = {}
     step_shared.encountered_materials = {}
 
-    with PreserveSelectionsStep(context):
+    with (
+        ObjectModeStep(context) as s,
+        PreserveSelectionsStep(context) as s,
+    ):
         return execute_inner(context, [], stack, collection, step_shared)
 
 
@@ -690,6 +740,7 @@ def execute_inner(context, objects, stack, root, step_shared):
 
     with (
         InitialStep(context, collection, root, step_shared, list(collection.objects)) as s,
+        UnhideStep(s) as s,
         RenameStep(s) as s,
         BakeStep(s) as s,
         DuplicateStep(s) as s,
@@ -726,6 +777,7 @@ def execute_inner(context, objects, stack, root, step_shared):
         
         with (
             InitialStep(context, root, root, step_shared, list(objects)) as s,
+            UnhideStep(s),
             ExportStep(s),
         ):
             return True
