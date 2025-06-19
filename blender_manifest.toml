@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "mergeexporter"
-version = "1.0.0"
+version = "1.1.0"
 name = "Merge Exporter"
 tagline = "An extension to simplify exporting and merging objects together"
 maintainer = "Arlirad <arlirad.ndv@gmail.com>"
@@ -20,7 +20,7 @@ license = [
   "SPDX:GPL-3.0-or-later",
 ]
 copyright = [
-  "2024 Arlirad"
+  "2025 Arlirad"
 ]
 
 [permissions]
