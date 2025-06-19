@@ -1,12 +1,7 @@
-if __name__ == "mergeexporter":
-    import steps
-else:
-    from . import steps
-
 import bpy
-import os
-import mathutils
-import math
+import importlib
+
+from . import steps
 
 
 class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
@@ -44,7 +39,6 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
 
         return {'FINISHED'}
 
-
     def swap_to(self, context, image):
         for obj in context.selected_objects:
             if obj.type != "MESH":
@@ -64,7 +58,8 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
                 for node in nodes:
                     node.select = False
 
-                tex_nodes = [node for node in nodes if node.type == 'TEX_IMAGE']
+                tex_nodes = [
+                    node for node in nodes if node.type == 'TEX_IMAGE']
 
                 if len(tex_nodes) == 0:
                     continue
@@ -79,19 +74,18 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
 
                     break
 
-
     def prepare_masker(self, context):
         if not "masker" in bpy.data.materials:
             masker = bpy.data.materials.new(name="masker")
             masker.use_nodes = True
-            
+
         masker = bpy.data.materials["masker"]
         node_tree = masker.node_tree
         divisor = context.scene.merge_exporter_settings.material_count - 1
 
         for node in node_tree.nodes:
             node_tree.nodes.remove(node)
-            
+
         node_attribute = node_tree.nodes.new(type='ShaderNodeAttribute')
         node_attribute.attribute_name = "material_index"
 
@@ -103,7 +97,7 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
         node_add = node_tree.nodes.new(type='ShaderNodeMath')
         node_add.location = (320, 0)
         node_add.operation = 'ADD'
-        node_add.inputs[1].default_value = 0.00 #(1.00 / divisor) / 3
+        node_add.inputs[1].default_value = 0.00  # (1.00 / divisor) / 3
 
         node_clamp = node_tree.nodes.new(type='ShaderNodeClamp')
         node_clamp.location = (480, 0)
@@ -132,7 +126,6 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
 
         return masker
 
-
     def bake_mask(self, context, mask):
         saved_materials = {}
         masker = self.prepare_masker(context)
@@ -145,7 +138,7 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
                 obj.data.materials[i] = masker
 
             self.swap_to(context, mask)
-        
+
         bpy.ops.object.bake(type="DIFFUSE")
 
         for obj in context.selected_objects:
@@ -153,7 +146,6 @@ class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
 
             for i in range(0, len(obj.data.materials)):
                 obj.data.materials[i] = mats[i]
-
 
     def get(self, name):
         images = bpy.data.images
@@ -199,9 +191,12 @@ class MergeExporter_CollectionProps(bpy.types.PropertyGroup):
     active: bpy.props.BoolProperty(name="Active", default=False)
     bake: bpy.props.BoolProperty(name="Bake", default=True)
     materialize: bpy.props.BoolProperty(name="Materialize", default=True)
+    outline_correction: bpy.props.BoolProperty(
+        name="Outline Correction", default=False)
     path: bpy.props.StringProperty(name="Export Path", subtype='DIR_PATH')
     origin: bpy.props.PointerProperty(name="Origin", type=bpy.types.Object)
-    use_origin_scale: bpy.props.BoolProperty(name="Use Origin Scale", default=False)
+    use_origin_scale: bpy.props.BoolProperty(
+        name="Use Origin Scale", default=False)
     export_origin: bpy.props.BoolProperty(name="Export Origin", default=True)
     texture_size: bpy.props.IntProperty(name="Texture Size", default=2048)
     override_name: bpy.props.BoolProperty(name="Override Name", default=False)
@@ -252,15 +247,19 @@ class OBJECT_UL_MergeExporter_ObjectList(bpy.types.UIList):
 
 
 class MergeExporter_SettingsSettings(bpy.types.PropertyGroup):
-    collections: bpy.props.CollectionProperty(type=MergeExporter_Exportable, name="collections")
+    collections: bpy.props.CollectionProperty(
+        type=MergeExporter_Exportable, name="collections")
     entities: bpy.props.BoolProperty(name="entities", default=False)
-    entity_details: bpy.props.BoolProperty(name="entity_details", default=False)
+    entity_details: bpy.props.BoolProperty(
+        name="entity_details", default=False)
     export_index: bpy.props.IntProperty(name="export_index")
     textures: bpy.props.BoolProperty(name="textures", default=False)
     textures: bpy.props.BoolProperty(name="textures", default=False)
     material_count: bpy.props.IntProperty(name="Material Count", default=5)
-    texture_toggles: bpy.props.PointerProperty(type=MergeExporter_TextureToggles)
-    object_details: bpy.props.BoolProperty(name="object_details", default=False)
+    texture_toggles: bpy.props.PointerProperty(
+        type=MergeExporter_TextureToggles)
+    object_details: bpy.props.BoolProperty(
+        name="object_details", default=False)
     object_index: bpy.props.IntProperty(name="object_index")
     export_format: bpy.props.EnumProperty(
         name="Export Format",
@@ -298,7 +297,8 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
         if sub_panel[1]:
             sub_layout = sub_panel[1]
             row = sub_layout.row()
-            row.template_list("COLLECTION_UL_MergeExporter_EntityList", "", my_settings, "collections", my_settings, "export_index")
+            row.template_list("COLLECTION_UL_MergeExporter_EntityList",
+                              "", my_settings, "collections", my_settings, "export_index")
 
         sub_panel = layout.panel_prop(my_settings, "entity_details")
         sub_panel[0].label(text="Entity Details")
@@ -314,7 +314,8 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
                     row = sub_layout.row()
                     row.active = False
                     column = row.column()
-                    column.prop(collection.merge_exporter_props, "override_name")
+                    column.prop(collection.merge_exporter_props,
+                                "override_name")
                     column = row.column()
                     column.prop(collection.merge_exporter_props, "name")
                     column.active = collection.merge_exporter_props.override_name
@@ -322,6 +323,10 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
                     row = sub_layout.row()
                     row.prop(collection.merge_exporter_props, "bake")
                     row.prop(collection.merge_exporter_props, "materialize")
+
+                    row = sub_layout.row()
+                    row.prop(collection.merge_exporter_props,
+                             "outline_correction")
 
                     row = sub_layout.row()
                     row.prop(collection.merge_exporter_props, "texture_size")
@@ -333,17 +338,21 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
 
                     row = sub_layout.row()
                     column = row.column()
-                    column.prop(collection.merge_exporter_props, "export_origin")
-                    column.prop(collection.merge_exporter_props, "use_origin_scale")
+                    column.prop(collection.merge_exporter_props,
+                                "export_origin")
+                    column.prop(collection.merge_exporter_props,
+                                "use_origin_scale")
                     column = row.column()
                     column.prop(collection.merge_exporter_props, "origin")
 
-                    sub_panel = layout.panel_prop(my_settings, "object_details")
+                    sub_panel = layout.panel_prop(
+                        my_settings, "object_details")
                     sub_panel[0].label(text="Object Details")
                     if sub_panel[1]:
                         sub_layout = sub_panel[1]
                         row = sub_layout.row()
-                        row.template_list("OBJECT_UL_MergeExporter_ObjectList", "", collection, "objects", my_settings, "object_index")
+                        row.template_list("OBJECT_UL_MergeExporter_ObjectList",
+                                          "", collection, "objects", my_settings, "object_index")
 
         sub_panel = layout.panel_prop(my_settings, "textures")
         sub_panel[0].label(text="Bake")
@@ -388,8 +397,10 @@ classes = [
     RENDER_PT_MergeExporterPanel
 ]
 
+
 def menu_func_export(self, context):
-    self.layout.operator(FILE_OT_MergeExport.bl_idname, text="Merge Export (.glb, .fbx)")
+    self.layout.operator(FILE_OT_MergeExport.bl_idname,
+                         text="Merge Export (.glb, .fbx)")
 
 
 def gather(collection, parent):
@@ -412,13 +423,16 @@ def depsgraph_update_post(dummy1, dummy2):
 bpy.app.handlers.depsgraph_update_post.append(depsgraph_update_post)
 
 
-
 def register():
+    importlib.reload(steps)
+
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    bpy.types.Collection.merge_exporter_props = bpy.props.PointerProperty(type=MergeExporter_CollectionProps)
-    bpy.types.Scene.merge_exporter_settings = bpy.props.PointerProperty(type=MergeExporter_SettingsSettings)
+    bpy.types.Collection.merge_exporter_props = bpy.props.PointerProperty(
+        type=MergeExporter_CollectionProps)
+    bpy.types.Scene.merge_exporter_settings = bpy.props.PointerProperty(
+        type=MergeExporter_SettingsSettings)
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
