@@ -7,10 +7,13 @@ class ObjectModeStep(Step):
     def __init__(self, previous):
         super().__init__(previous)
         self.mode = None
+        self.object = None
 
     def __enter__(self):
-        if bpy.context.object:
-            self.mode = bpy.context.object.mode
+        self.object = bpy.context.view_layer.objects.active
+
+        if self.object:
+            self.mode = self.object.mode
             bpy.ops.object.mode_set(mode='OBJECT')
 
         return self
