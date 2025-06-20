@@ -368,6 +368,8 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
         sub_panel = layout.panel_prop(my_settings, "textures")
         sub_panel[0].label(text="Bake")
         if sub_panel[1]:
+            sub_panel[1].active = collection.merge_exporter_props.bake
+
             sub_layout = sub_panel[1]
             sub_layout.prop(my_settings, "material_count")
 
