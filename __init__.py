@@ -1,7 +1,11 @@
 import bpy
 import importlib
 
+from .descriptions import props
 from . import steps
+
+importlib.reload(descriptions)
+importlib.reload(steps)
 
 
 class COLLECTION_OT_MergeExportBake(bpy.types.Operator):
@@ -188,13 +192,18 @@ class MergeExporter_Exportable(bpy.types.PropertyGroup):
 
 
 class MergeExporter_CollectionProps(bpy.types.PropertyGroup):
-    active: bpy.props.BoolProperty(name="Active", default=False)
-    bake: bpy.props.BoolProperty(name="Bake", default=True)
-    materialize: bpy.props.BoolProperty(name="Materialize", default=True)
+    active: bpy.props.BoolProperty(
+        name="Active", default=False, description=props["collection.active"])
+    bake: bpy.props.BoolProperty(
+        name="Bake", default=True, description=props["collection.bake"])
+    materialize: bpy.props.BoolProperty(
+        name="Materialize", default=True, description=props["collection.materialize"])
     outline_correction: bpy.props.BoolProperty(
-        name="Outline Correction", default=False)
-    path: bpy.props.StringProperty(name="Export Path", subtype='DIR_PATH')
-    origin: bpy.props.PointerProperty(name="Origin", type=bpy.types.Object)
+        name="Outline Correction", default=False, description=props["collection.outline_correction"])
+    path: bpy.props.StringProperty(name="Export Path", subtype='DIR_PATH',
+                                   description=props["collection.path"])
+    origin: bpy.props.PointerProperty(name="Origin", type=bpy.types.Object,
+                                      description=props["collection.origin"])
     use_origin_scale: bpy.props.BoolProperty(
         name="Use Origin Scale", default=False)
     export_origin: bpy.props.BoolProperty(name="Export Origin", default=True)
@@ -424,8 +433,6 @@ bpy.app.handlers.depsgraph_update_post.append(depsgraph_update_post)
 
 
 def register():
-    importlib.reload(steps)
-
     for cls in classes:
         bpy.utils.register_class(cls)
 
