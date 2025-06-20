@@ -340,9 +340,6 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
                              "outline_correction")
 
                     row = sub_layout.row()
-                    row.prop(collection.merge_exporter_props, "texture_size")
-
-                    row = sub_layout.row()
                     row.prop(collection.merge_exporter_props, "path")
                     if exportables[my_settings.export_index].parent:
                         row.active = False
@@ -371,6 +368,7 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
             sub_panel[1].active = collection.merge_exporter_props.bake
 
             sub_layout = sub_panel[1]
+            sub_layout.prop(collection.merge_exporter_props, "texture_size")
             sub_layout.prop(my_settings, "material_count")
 
             row = sub_layout.row()
