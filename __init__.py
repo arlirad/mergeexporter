@@ -390,6 +390,7 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
         sub_row.prop(my_settings, "export_format", expand=True)
 
         row = layout.row()
+        row.active = collection.merge_exporter_props.bake
         row.prop(my_settings, "save_textures", expand=True)
         row.prop(my_settings, "export_texture_format", expand=True)
 
