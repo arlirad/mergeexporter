@@ -102,8 +102,8 @@ class MergeMeshesStep(Step):
 
         name = self.collection.name
 
-        # if self.collection.merge_exporter_props.override_name:
-        #    name = self.collection.merge_exporter_props.name
+        if self.collection.merge_exporter_props.override_name:
+            name = self.collection.merge_exporter_props.name
 
         if name in bpy.context.scene.objects:
             to_rename = bpy.context.scene.objects[name]
@@ -134,7 +134,12 @@ class ExportStep(Step):
         format = self.context.scene.merge_exporter_settings.export_format
         props = self.collection.merge_exporter_props
         prefix = os.path.abspath(bpy.path.abspath(props.path)) + "/"
-        path = prefix + self.collection.name + "." + format
+        name = self.collection.name
+
+        if self.collection.merge_exporter_props.override_name:
+            name = self.collection.merge_exporter_props.name
+
+        path = prefix + name + "." + format
 
         self.select()
 

@@ -209,7 +209,8 @@ class MergeExporter_CollectionProps(bpy.types.PropertyGroup):
     export_origin: bpy.props.BoolProperty(
         name="Export Origin", default=True, description=props["collection.export_origin"])
     texture_size: bpy.props.IntProperty(name="Texture Size", default=2048)
-    override_name: bpy.props.BoolProperty(name="Override Name", default=False)
+    override_name: bpy.props.BoolProperty(
+        name="Override Name", default=False, description=props["collection.override_name"])
     name: bpy.props.StringProperty(name="Name", default="merged")
 
 
@@ -322,7 +323,7 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
                     sub_layout = sub_panel[1]
 
                     row = sub_layout.row()
-                    row.active = False
+                    row.active = True
                     column = row.column()
                     column.prop(collection.merge_exporter_props,
                                 "override_name")

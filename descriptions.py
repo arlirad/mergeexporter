@@ -7,4 +7,5 @@ props = {
     "collection.origin": """Origin object.""",
     "collection.use_origin_scale": """Preserve scale on export.""",
     "collection.export_origin": """Include origin in export.""",
+    "collection.override_name": """Override name for merged mesh and file."""
 }
