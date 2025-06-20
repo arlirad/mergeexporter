@@ -31,7 +31,9 @@ class UnhideStep(Step):
 
     def __enter__(self):
         layer_collection = self.context.view_layer.layer_collection
-        layer_collection_collection = layer_collection.children[self.collection.name]
+        layer_collection_collection = self.find_layer_collection(
+            layer_collection, self.collection.name
+        )
 
         self.collection_was_visible = layer_collection_collection.hide_viewport
         layer_collection_collection.hide_viewport = False
@@ -49,9 +51,22 @@ class UnhideStep(Step):
 
     def __exit__(self, *args):
         layer_collection = self.context.view_layer.layer_collection
-        layer_collection.children[self.collection.name].hide_viewport = self.collection_was_visible
+        self.find_layer_collection(
+            layer_collection, self.collection.name
+        ).hide_viewport = self.collection_was_visible
 
         for visibility in self.visibilities:
             visibility[0].hide_set(visibility[1])
             visibility[0].hide_viewport = visibility[2]
             visibility[0].hide_render = visibility[3]
+
+    def find_layer_collection(self, layer_collection, name):
+        if layer_collection.name == name:
+            return layer_collection
+
+        for child in layer_collection.children:
+            found = self.find_layer_collection(child, name)
+            if found:
+                return found
+
+        return None
