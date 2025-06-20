@@ -11,8 +11,7 @@ class ReoriginStep(Step):
     def __init__(self, previous):
         super().__init__(previous)
 
-        self.origin = Matrix.Identity(4)
-        self.origin_pure = None
+        self.matrices = []
 
     def __enter__(self):
         props = self.collection.merge_exporter_props
@@ -20,27 +19,29 @@ class ReoriginStep(Step):
         if not props.origin:
             return self
 
-        self.origin = Matrix(props.origin.matrix_world)
-        self.origin_pure = Matrix(props.origin.matrix_world)
+        for object in self.objects:
+            self.matrices.append((object, Matrix(object.matrix_world)))
 
-        if not props.use_origin_scale:
-            decomposed = self.origin.decompose()
-            self.origin_pure = Matrix.LocRotScale(
+        origin = Matrix(props.origin.matrix_world)
+
+        if props.use_origin_scale:
+            decomposed = origin.decompose()
+            origin = Matrix.LocRotScale(
                 decomposed[0], decomposed[1], Vector((1.00, 1.00, 1.00)))
 
         for object in self.objects:
-            object.matrix_world = self.origin.inverted() @ object.matrix_world
+            object.matrix_world = origin.inverted() @ object.matrix_world
 
         return self
 
     def __exit__(self, *args):
         props = self.collection.merge_exporter_props
 
-        for object in self.objects:
-            object.matrix_world = self.origin @ object.matrix_world
+        if not props.origin:
+            return
 
-        if props.origin:
-            props.origin.matrix_world = self.origin_pure
+        for matrix in self.matrices:
+            matrix[0].matrix_world = matrix[1]
 
 
 class ReparentStep(Step):

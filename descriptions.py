@@ -5,4 +5,6 @@ props = {
     "collection.outline_correction": """Create a UV map storing X and Y normal coordinates for correcting normals in reverse-hull outlines on sharp edges.""",
     "collection.path": """Export directory.""",
     "collection.origin": """Origin object.""",
+    "collection.use_origin_scale": """Preserve scale on export.""",
+    "collection.export_origin": """Include origin in export.""",
 }

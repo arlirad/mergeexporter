@@ -205,8 +205,9 @@ class MergeExporter_CollectionProps(bpy.types.PropertyGroup):
     origin: bpy.props.PointerProperty(name="Origin", type=bpy.types.Object,
                                       description=props["collection.origin"])
     use_origin_scale: bpy.props.BoolProperty(
-        name="Use Origin Scale", default=False)
-    export_origin: bpy.props.BoolProperty(name="Export Origin", default=True)
+        name="Use Origin Scale", default=False, description=props["collection.use_origin_scale"])
+    export_origin: bpy.props.BoolProperty(
+        name="Export Origin", default=True, description=props["collection.export_origin"])
     texture_size: bpy.props.IntProperty(name="Texture Size", default=2048)
     override_name: bpy.props.BoolProperty(name="Override Name", default=False)
     name: bpy.props.StringProperty(name="Name", default="merged")
