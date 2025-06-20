@@ -228,7 +228,7 @@ class MergeExporter_TextureToggles(bpy.types.PropertyGroup):
         default=True,
     )
     mask_toggle: bpy.props.BoolProperty(
-        name="Mask",
+        name="Material Index",
         default=True,
     )
     emission_toggle: bpy.props.BoolProperty(
