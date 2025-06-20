@@ -303,6 +303,9 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
         layout = self.layout
         my_settings = context.scene.merge_exporter_settings
 
+        exportables = my_settings.collections
+        collection = exportables[my_settings.export_index].collection
+
         sub_panel = layout.panel_prop(my_settings, "entities")
         sub_panel[0].label(text="Entities")
         if sub_panel[1]:
@@ -314,11 +317,7 @@ class RENDER_PT_MergeExporterPanel(bpy.types.Panel):
         sub_panel = layout.panel_prop(my_settings, "entity_details")
         sub_panel[0].label(text="Entity Details")
         if sub_panel[1]:
-            exportables = my_settings.collections
-
             if my_settings.export_index < len(exportables):
-                collection = exportables[my_settings.export_index].collection
-
                 if collection != None:
                     sub_layout = sub_panel[1]
 
